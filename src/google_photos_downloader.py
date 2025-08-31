@@ -90,6 +90,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import pickle
 import uuid
+import yaml
 
 # Import calendar widget
 try:
@@ -113,6 +114,118 @@ except ImportError:
 
 # Google Photos API scope
 SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly']
+
+class ConfigManager:
+    """Manages application configuration from YAML file."""
+    
+    def __init__(self, config_path: str = "config/config.yaml"):
+        self.config_path = config_path
+        self.config = {}
+        self.default_config = {
+            'download': {
+                'max_workers': 5,
+                'chunk_size': 8192,
+                'retry_attempts': 3,
+                'timeout': 30
+            },
+            'files': {
+                'naming_pattern': '{timestamp}_{filename}',
+                'duplicate_detection': True,
+                'create_date_folders': False
+            },
+            'ui': {
+                'theme': 'light',
+                'auto_refresh_albums': True,
+                'remember_window_size': True
+            },
+            'advanced': {
+                'enable_logging': True,
+                'log_level': 'INFO',
+                'state_persistence': True,
+                'cleanup_temp_files': True
+            },
+            'api': {
+                'page_size': 100,
+                'rate_limit_delay': 0.1
+            },
+            'security': {
+                'verify_checksums': True,
+                'secure_token_storage': True
+            }
+        }
+        self.load_config()
+    
+    def load_config(self):
+        """Load configuration from YAML file."""
+        try:
+            with open(self.config_path, 'r') as f:
+                self.config = yaml.safe_load(f) or {}
+                
+            # Merge with defaults to ensure all keys exist
+            self.config = self._merge_configs(self.default_config, self.config)
+            
+        except FileNotFoundError:
+            print(f"Config file not found at {self.config_path}, using defaults")
+            self.config = self.default_config.copy()
+            self.save_config()
+        except yaml.YAMLError as e:
+            print(f"Error parsing config file: {e}, using defaults")
+            self.config = self.default_config.copy()
+    
+    def save_config(self):
+        """Save current configuration to YAML file."""
+        try:
+            # Ensure config directory exists
+            config_dir = Path(self.config_path).parent
+            config_dir.mkdir(parents=True, exist_ok=True)
+            
+            with open(self.config_path, 'w') as f:
+                yaml.dump(self.config, f, default_flow_style=False, indent=2)
+                
+        except Exception as e:
+            print(f"Error saving config: {e}")
+    
+    def _merge_configs(self, default: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
+        """Recursively merge user config with defaults."""
+        result = default.copy()
+        
+        for key, value in user.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._merge_configs(result[key], value)
+            else:
+                result[key] = value
+                
+        return result
+    
+    def get(self, path: str, default=None):
+        """Get configuration value using dot notation (e.g., 'download.max_workers')."""
+        keys = path.split('.')
+        value = self.config
+        
+        try:
+            for key in keys:
+                value = value[key]
+            return value
+        except (KeyError, TypeError):
+            return default
+    
+    def set(self, path: str, value: Any):
+        """Set configuration value using dot notation."""
+        keys = path.split('.')
+        config = self.config
+        
+        # Navigate to the parent of the target key
+        for key in keys[:-1]:
+            if key not in config:
+                config[key] = {}
+            config = config[key]
+        
+        # Set the value
+        config[keys[-1]] = value
+    
+    def get_section(self, section: str) -> Dict[str, Any]:
+        """Get entire configuration section."""
+        return self.config.get(section, {})
 
 class DownloadSession:
     """Manages download session state for resume capability."""
@@ -263,7 +376,7 @@ class DownloadStats:
 class GooglePhotosDownloader:
     """Core downloader class handling Google Photos API interactions."""
     
-    def __init__(self, credentials_file: str = 'credentials.json', token_file: str = 'token.json'):
+    def __init__(self, credentials_file: str = 'credentials.json', token_file: str = 'token.json', config: ConfigManager = None):
         """Initialize the Google Photos downloader."""
         self.credentials_file = credentials_file
         self.token_file = token_file
@@ -274,6 +387,7 @@ class GooglePhotosDownloader:
         self.cancelled = False
         self.stats = DownloadStats()
         self.current_session = None
+        self.config = config or ConfigManager()
         
     def set_callbacks(self, progress_callback: Optional[Callable] = None, 
                      status_callback: Optional[Callable] = None):
@@ -752,14 +866,17 @@ class GooglePhotosDownloader:
 class GooglePhotosGUI:
     """Main GUI application class."""
     
-    def __init__(self):
+    def __init__(self, config: ConfigManager = None):
         self.root = tk.Tk()
         self.root.title("Google Photos Downloader v2.0")
         self.root.geometry("600x500")
         self.root.resizable(True, True)
         
+        # Configuration management
+        self.config = config or ConfigManager()
+        
         # Theme management
-        self.dark_mode = False
+        self.dark_mode = self.config.get('ui.theme') == 'dark'
         self.themes = {
             'light': {
                 'bg': '#ffffff',
@@ -789,7 +906,7 @@ class GooglePhotosGUI:
         except:
             pass  # Icon file not found, continue without it
         
-        self.downloader = GooglePhotosDownloader()
+        self.downloader = GooglePhotosDownloader(config=self.config)
         self.download_thread = None
         self.is_downloading = False
         
@@ -1416,6 +1533,10 @@ class GooglePhotosGUI:
         self.dark_mode = not self.dark_mode
         self.apply_theme()
         
+        # Save theme preference to config
+        self.config.set('ui.theme', 'dark' if self.dark_mode else 'light')
+        self.config.save_config()
+        
         # Update button text
         if self.dark_mode:
             self.theme_button.config(text="☀️ Light Mode")
@@ -1530,7 +1651,8 @@ def main():
             sys.exit(1)
         
         try:
-            app = GooglePhotosGUI()
+            config = ConfigManager()
+            app = GooglePhotosGUI(config)
             app.run()
         except Exception as e:
             print(f"❌ Failed to start GUI: {e}")

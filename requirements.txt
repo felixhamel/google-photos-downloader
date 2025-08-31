@@ -6,6 +6,7 @@ google-api-python-client>=2.88.0
 requests>=2.31.0
 tkcalendar>=1.6.1
 pillow>=10.0.0
+pyyaml>=6.0
 
 # Development Dependencies (for building from source)
 pytest>=7.4.0

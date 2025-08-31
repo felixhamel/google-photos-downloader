@@ -1,0 +1,38 @@
+# Google Photos Downloader Configuration
+# This file contains settings for the application
+
+# Download Settings
+download:
+  max_workers: 5  # Number of concurrent download threads
+  chunk_size: 8192  # Download chunk size in bytes
+  retry_attempts: 3  # Number of retry attempts for failed downloads
+  timeout: 30  # Request timeout in seconds
+  
+# File Management  
+files:
+  naming_pattern: "{timestamp}_{filename}"  # File naming pattern
+  duplicate_detection: true  # Enable checksum-based duplicate detection
+  create_date_folders: false  # Organize files into date-based folders
+  
+# UI Settings
+ui:
+  theme: "light"  # Default theme: "light" or "dark"
+  auto_refresh_albums: true  # Automatically refresh albums on startup
+  remember_window_size: true  # Remember window size and position
+  
+# Advanced Settings
+advanced:
+  enable_logging: true  # Enable detailed logging
+  log_level: "INFO"  # Log level: DEBUG, INFO, WARNING, ERROR
+  state_persistence: true  # Enable download state persistence
+  cleanup_temp_files: true  # Clean up temporary files on exit
+  
+# API Settings
+api:
+  page_size: 100  # Number of items to fetch per API request
+  rate_limit_delay: 0.1  # Delay between API requests (seconds)
+  
+# Security Settings
+security:
+  verify_checksums: true  # Verify file integrity with checksums
+  secure_token_storage: true  # Use secure token storage when available
