@@ -480,9 +480,32 @@ class GooglePhotosDownloader:
         
         return media_items
     
+    def _calculate_file_checksum(self, file_path: Path) -> str:
+        """Calculate SHA256 checksum of a file."""
+        sha256_hash = hashlib.sha256()
+        try:
+            with open(file_path, "rb") as f:
+                # Read in chunks to handle large files efficiently
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256_hash.update(chunk)
+            return sha256_hash.hexdigest()
+        except Exception:
+            return ""
+    
+    def _find_duplicate_by_checksum(self, output_dir: Path, target_checksum: str, exclude_file: str = None) -> Optional[Path]:
+        """Find a file with matching checksum in the output directory."""
+        try:
+            for file_path in output_dir.glob("*"):
+                if file_path.is_file() and file_path.name != exclude_file:
+                    if self._calculate_file_checksum(file_path) == target_checksum:
+                        return file_path
+            return None
+        except Exception:
+            return None
+    
     async def download_media_item_async(self, item: Dict[str, Any], output_dir: Path) -> tuple[bool, int]:
         """
-        Download a single media item.
+        Download a single media item with checksum-based duplicate detection.
         
         Returns:
             Tuple of (success: bool, file_size: int)
@@ -500,9 +523,11 @@ class GooglePhotosDownloader:
             safe_filename = f"{safe_timestamp}_{name}{ext}"
             file_path = output_dir / safe_filename
             
-            # Skip if file already exists
+            # Skip if exact file already exists
             if file_path.exists():
-                return True, file_path.stat().st_size
+                existing_size = file_path.stat().st_size
+                self.update_status(f"⏭️ Skipping existing file: {safe_filename}")
+                return True, existing_size
             
             # Determine download URL based on media type
             if 'photo' in media_metadata:
@@ -523,17 +548,39 @@ class GooglePhotosDownloader:
                     response = requests.get(download_url, stream=True, timeout=30)
                     response.raise_for_status()
                     
+                    # Create temporary file first
+                    temp_file = file_path.with_suffix(f"{file_path.suffix}.tmp")
                     file_size = 0
-                    with open(file_path, 'wb') as f:
+                    
+                    with open(temp_file, 'wb') as f:
                         for chunk in response.iter_content(chunk_size=8192):
                             if self.cancelled:
                                 f.close()
-                                file_path.unlink(missing_ok=True)
+                                temp_file.unlink(missing_ok=True)
                                 return False, 0
                             f.write(chunk)
                             file_size += len(chunk)
                     
-                    return True, file_size
+                    # Calculate checksum of downloaded file
+                    downloaded_checksum = self._calculate_file_checksum(temp_file)
+                    
+                    if not downloaded_checksum:
+                        temp_file.unlink(missing_ok=True)
+                        self.update_status(f"❌ Could not calculate checksum for {filename}")
+                        return False, 0
+                    
+                    # Check for duplicates by checksum in output directory
+                    duplicate_path = self._find_duplicate_by_checksum(output_dir, downloaded_checksum, safe_filename)
+                    
+                    if duplicate_path:
+                        # File with same content already exists
+                        temp_file.unlink(missing_ok=True)
+                        self.update_status(f"🔗 Duplicate detected: {filename} (same as {duplicate_path.name})")
+                        return True, duplicate_path.stat().st_size
+                    else:
+                        # Move temp file to final location
+                        temp_file.rename(file_path)
+                        return True, file_size
                     
                 except (requests.RequestException, IOError) as e:
                     if attempt < max_retries - 1:
