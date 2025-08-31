@@ -7,14 +7,26 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from app.models.schemas import (
-    DownloadRequest, ResumeRequest, ApiResponse, AuthStatus,
-    AlbumInfo, SessionInfo, ConfigUpdate, ErrorResponse
-)
-from app.core.downloader import GooglePhotosDownloader
-from app.core.session import DownloadSession
-from app.core.config import ConfigManager
-from app.api.websockets import ConnectionManager
+try:
+    from app.models.schemas import (
+        DownloadRequest, ResumeRequest, ApiResponse, AuthStatus,
+        AlbumInfo, SessionInfo, ConfigUpdate, ErrorResponse
+    )
+except ImportError:
+    from models.schemas import (
+        DownloadRequest, ResumeRequest, ApiResponse, AuthStatus,
+        AlbumInfo, SessionInfo, ConfigUpdate, ErrorResponse
+    )
+try:
+    from app.core.downloader import GooglePhotosDownloader
+    from app.core.session import DownloadSession
+    from app.core.config import ConfigManager
+    from app.api.websockets import ConnectionManager
+except ImportError:
+    from core.downloader import GooglePhotosDownloader
+    from core.session import DownloadSession
+    from core.config import ConfigManager
+    from api.websockets import ConnectionManager
 
 router = APIRouter()
 config = ConfigManager()
