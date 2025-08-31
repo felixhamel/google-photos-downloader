@@ -88,6 +88,8 @@ from typing import Optional, List, Dict, Any, Callable
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
+import pickle
+import uuid
 
 # Import calendar widget
 try:
@@ -111,6 +113,111 @@ except ImportError:
 
 # Google Photos API scope
 SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly']
+
+class DownloadSession:
+    """Manages download session state for resume capability."""
+    
+    def __init__(self, session_id: str = None):
+        self.session_id = session_id or str(uuid.uuid4())
+        self.output_dir = None
+        self.media_items = []
+        self.completed_items = set()
+        self.failed_items = set()
+        self.download_params = {}
+        self.created_at = datetime.now()
+        self.last_updated = datetime.now()
+        
+    def save_state(self, state_dir: str = ".download_state"):
+        """Save session state to disk."""
+        state_path = Path(state_dir)
+        state_path.mkdir(exist_ok=True)
+        
+        session_file = state_path / f"session_{self.session_id}.pkl"
+        self.last_updated = datetime.now()
+        
+        with open(session_file, 'wb') as f:
+            pickle.dump(self.__dict__, f)
+    
+    @classmethod
+    def load_state(cls, session_id: str, state_dir: str = ".download_state"):
+        """Load session state from disk."""
+        state_path = Path(state_dir)
+        session_file = state_path / f"session_{session_id}.pkl"
+        
+        if not session_file.exists():
+            return None
+            
+        try:
+            with open(session_file, 'rb') as f:
+                data = pickle.load(f)
+            
+            session = cls()
+            session.__dict__.update(data)
+            return session
+        except Exception:
+            return None
+    
+    @classmethod
+    def list_sessions(cls, state_dir: str = ".download_state") -> List[Dict[str, Any]]:
+        """List all available download sessions."""
+        state_path = Path(state_dir)
+        if not state_path.exists():
+            return []
+        
+        sessions = []
+        for session_file in state_path.glob("session_*.pkl"):
+            try:
+                with open(session_file, 'rb') as f:
+                    data = pickle.load(f)
+                sessions.append({
+                    'session_id': data.get('session_id'),
+                    'created_at': data.get('created_at'),
+                    'last_updated': data.get('last_updated'),
+                    'total_items': len(data.get('media_items', [])),
+                    'completed_items': len(data.get('completed_items', [])),
+                    'output_dir': data.get('output_dir')
+                })
+            except Exception:
+                continue
+        
+        return sorted(sessions, key=lambda x: x['last_updated'], reverse=True)
+    
+    def cleanup(self, state_dir: str = ".download_state"):
+        """Remove session state file."""
+        state_path = Path(state_dir)
+        session_file = state_path / f"session_{self.session_id}.pkl"
+        if session_file.exists():
+            session_file.unlink()
+    
+    def get_remaining_items(self) -> List[Dict[str, Any]]:
+        """Get list of items that still need to be downloaded."""
+        return [item for item in self.media_items 
+                if item['id'] not in self.completed_items and item['id'] not in self.failed_items]
+    
+    def mark_completed(self, item_id: str):
+        """Mark an item as completed."""
+        self.completed_items.add(item_id)
+        self.failed_items.discard(item_id)  # Remove from failed if present
+    
+    def mark_failed(self, item_id: str):
+        """Mark an item as failed."""
+        self.failed_items.add(item_id)
+        self.completed_items.discard(item_id)  # Remove from completed if present
+    
+    def get_progress(self) -> Dict[str, int]:
+        """Get current progress statistics."""
+        total = len(self.media_items)
+        completed = len(self.completed_items)
+        failed = len(self.failed_items)
+        remaining = total - completed - failed
+        
+        return {
+            'total': total,
+            'completed': completed,
+            'failed': failed,
+            'remaining': remaining,
+            'percentage': (completed / total * 100) if total > 0 else 0
+        }
 
 class DownloadStats:
     """Track download statistics and calculate speeds/ETA."""
@@ -166,6 +273,7 @@ class GooglePhotosDownloader:
         self.status_callback = None
         self.cancelled = False
         self.stats = DownloadStats()
+        self.current_session = None
         
     def set_callbacks(self, progress_callback: Optional[Callable] = None, 
                      status_callback: Optional[Callable] = None):
@@ -441,43 +549,81 @@ class GooglePhotosDownloader:
     
     async def download_photos_async(self, start_date: datetime = None, end_date: datetime = None, 
                                    output_dir: str = None, max_workers: int = 5, 
-                                   album_id: str = None, media_types: List[str] = None) -> None:
-        """Main async method to download photos with various filters and concurrent downloads."""
+                                   album_id: str = None, media_types: List[str] = None,
+                                   resume_session_id: str = None) -> None:
+        """Main async method to download photos with various filters, concurrent downloads, and resume capability."""
         self.cancelled = False
         
-        # Create output directory
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        
-        # Get media items based on filters
-        if album_id:
-            media_items = await self.get_media_items_async(album_id=album_id)
-        elif start_date and end_date:
-            media_items = await self.get_media_items_async(start_date, end_date, media_types=media_types)
+        # Handle resume functionality
+        if resume_session_id:
+            self.current_session = DownloadSession.load_state(resume_session_id)
+            if self.current_session:
+                output_dir = self.current_session.output_dir
+                media_items = self.current_session.get_remaining_items()
+                progress = self.current_session.get_progress()
+                
+                self.update_status(f"📂 Resuming download session... {progress['completed']}/{progress['total']} items completed")
+                if not media_items:
+                    self.update_status(f"✅ Session already completed! {progress['completed']} items downloaded")
+                    return
+            else:
+                self.update_status(f"❌ Could not load session {resume_session_id}")
+                return
         else:
-            self.update_status("❌ Either date range or album must be specified")
-            return
-        
-        if not media_items:
-            source_desc = f"album" if album_id else f"date range {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
-            self.update_status(f"📭 No photos found in the specified {source_desc}.")
-            return
+            # Create new session
+            self.current_session = DownloadSession()
+            self.current_session.output_dir = output_dir
+            self.current_session.download_params = {
+                'start_date': start_date,
+                'end_date': end_date,
+                'album_id': album_id,
+                'media_types': media_types
+            }
+            
+            # Create output directory
+            output_path = Path(output_dir)
+            output_path.mkdir(parents=True, exist_ok=True)
+            
+            # Get media items based on filters
+            if album_id:
+                media_items = await self.get_media_items_async(album_id=album_id)
+            elif start_date and end_date:
+                media_items = await self.get_media_items_async(start_date, end_date, media_types=media_types)
+            else:
+                self.update_status("❌ Either date range or album must be specified")
+                return
+            
+            if not media_items:
+                source_desc = f"album" if album_id else f"date range {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+                self.update_status(f"📭 No photos found in the specified {source_desc}.")
+                return
+            
+            # Store media items in session
+            self.current_session.media_items = media_items
+            self.current_session.save_state()
         
         if self.cancelled:
             return
         
+        output_path = Path(self.current_session.output_dir)
+        
         # Initialize statistics
-        total_count = len(media_items)
-        success_count = 0
+        total_count = len(self.current_session.media_items)
+        already_completed = len(self.current_session.completed_items)
+        remaining_count = len(media_items)
+        success_count = already_completed
         failed_items = []
-        self.stats.start(total_count)
+        self.stats.start(remaining_count)
         
         source_desc = f"album" if album_id else "date range"
-        self.update_status(f"📥 Starting concurrent download of {total_count} items from {source_desc} with {max_workers} workers...")
+        if resume_session_id:
+            self.update_status(f"📥 Resuming concurrent download of {remaining_count} remaining items with {max_workers} workers...")
+        else:
+            self.update_status(f"📥 Starting concurrent download of {total_count} items from {source_desc} with {max_workers} workers...")
         
         # Use ThreadPoolExecutor for concurrent downloads
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all download tasks
+            # Submit remaining download tasks
             future_to_item = {}
             for i, item in enumerate(media_items, 1):
                 if self.cancelled:
@@ -491,7 +637,8 @@ class GooglePhotosDownloader:
             for future in as_completed(future_to_item):
                 if self.cancelled:
                     executor.shutdown(wait=False)
-                    self.update_status("🛑 Download cancelled by user")
+                    self.update_status("🛑 Download cancelled by user - state saved for resume")
+                    self.current_session.save_state()
                     break
                 
                 item, index = future_to_item[future]
@@ -502,27 +649,41 @@ class GooglePhotosDownloader:
                     if success:
                         success_count += 1
                         self.stats.update(file_size)
+                        self.current_session.mark_completed(item['id'])
                     else:
                         failed_items.append(item.get('filename', f'item_{index}'))
+                        self.current_session.mark_failed(item['id'])
                     
-                    # Update progress
-                    percentage = (completed / total_count) * 100
-                    self.update_progress(completed, total_count, percentage)
+                    # Save state periodically (every 10 items)
+                    if completed % 10 == 0:
+                        self.current_session.save_state()
+                    
+                    # Update progress (include already completed items)
+                    total_progress = already_completed + completed
+                    percentage = (total_progress / total_count) * 100
+                    self.update_progress(total_progress, total_count, percentage)
                     
                 except Exception as e:
                     completed += 1
                     failed_items.append(item.get('filename', f'item_{index}'))
+                    self.current_session.mark_failed(item['id'])
                     self.update_status(f"❌ Error downloading {item.get('filename', 'unknown')}: {e}")
                     
                     # Update progress even on failure
-                    percentage = (completed / total_count) * 100
-                    self.update_progress(completed, total_count, percentage)
+                    total_progress = already_completed + completed
+                    percentage = (total_progress / total_count) * 100
+                    self.update_progress(total_progress, total_count, percentage)
+        
+        # Final save and cleanup
+        self.current_session.save_state()
         
         if not self.cancelled:
             if failed_items:
                 self.update_status(f"⚠️ Download complete with errors! {success_count}/{total_count} items saved. Failed: {', '.join(failed_items[:5])}{'...' if len(failed_items) > 5 else ''}")
             else:
                 self.update_status(f"🎉 Download complete! {success_count}/{total_count} items saved to {output_path}")
+                # Clean up completed session
+                self.current_session.cleanup()
     
     def _download_item_sync(self, item: Dict[str, Any], output_dir: Path, index: int) -> tuple[bool, int]:
         """Synchronous wrapper for download_media_item_async for use with ThreadPoolExecutor."""
@@ -729,6 +890,10 @@ class GooglePhotosGUI:
         self.download_button = ttk.Button(button_frame, text="🚀 Start Download", 
                                         command=self.start_download)
         self.download_button.pack(side=tk.LEFT, padx=(0, 15))
+        
+        self.resume_button = ttk.Button(button_frame, text="📂 Resume Download", 
+                                      command=self.show_resume_dialog)
+        self.resume_button.pack(side=tk.LEFT, padx=(0, 15))
         
         self.cancel_button = ttk.Button(button_frame, text="⏹️ Cancel", 
                                       command=self.cancel_download, state=tk.DISABLED)
@@ -1003,6 +1168,128 @@ class GooglePhotosGUI:
         self.download_thread = threading.Thread(target=self.download_worker, daemon=True)
         self.download_thread.start()
     
+    def show_resume_dialog(self):
+        """Show dialog to select a download session to resume."""
+        sessions = DownloadSession.list_sessions()
+        if not sessions:
+            messagebox.showinfo("No Sessions", "No incomplete download sessions found.")
+            return
+        
+        # Create resume dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Resume Download Session")
+        dialog.geometry("600x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Session list
+        frame = ttk.Frame(dialog, padding="20")
+        frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(0, weight=1)
+        
+        ttk.Label(frame, text="Select a session to resume:", font=('Arial', 12, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=(0, 15))
+        
+        # Treeview for sessions
+        columns = ('Created', 'Progress', 'Output Directory')
+        tree = ttk.Treeview(frame, columns=columns, show='tree headings', height=10)
+        tree.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
+        
+        # Configure columns
+        tree.heading('#0', text='Session ID')
+        tree.heading('Created', text='Created')
+        tree.heading('Progress', text='Progress')
+        tree.heading('Output Directory', text='Output Directory')
+        
+        tree.column('#0', width=200)
+        tree.column('Created', width=150)
+        tree.column('Progress', width=100)
+        tree.column('Output Directory', width=200)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=tree.yview)
+        scrollbar.grid(row=1, column=2, sticky=(tk.N, tk.S))
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Populate sessions
+        for session in sessions:
+            created_str = session['created_at'].strftime('%Y-%m-%d %H:%M')
+            progress_str = f"{session['completed_items']}/{session['total_items']}"
+            tree.insert('', 'end', text=session['session_id'][:8] + '...', 
+                       values=(created_str, progress_str, session['output_dir'][:30] + '...'))
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=2, column=0, columnspan=2, pady=(15, 0))
+        
+        selected_session = [None]  # Use list to modify from nested function
+        
+        def on_resume():
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning("No Selection", "Please select a session to resume.")
+                return
+            
+            index = tree.index(selection[0])
+            selected_session[0] = sessions[index]['session_id']
+            dialog.destroy()
+        
+        def on_delete():
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning("No Selection", "Please select a session to delete.")
+                return
+            
+            if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this session?"):
+                index = tree.index(selection[0])
+                session_id = sessions[index]['session_id']
+                session = DownloadSession()
+                session.session_id = session_id
+                session.cleanup()
+                tree.delete(selection[0])
+                messagebox.showinfo("Deleted", "Session deleted successfully.")
+        
+        ttk.Button(button_frame, text="Resume", command=on_resume).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="Delete", command=on_delete).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT)
+        
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(1, weight=1)
+        
+        # Wait for dialog to close
+        dialog.wait_window()
+        
+        # Resume selected session
+        if selected_session[0]:
+            self.resume_download(selected_session[0])
+    
+    def resume_download(self, session_id: str):
+        """Resume a download session."""
+        self.add_status_message(f"📂 Resuming session: {session_id}")
+        
+        # Update button states
+        self.download_button.config(state=tk.DISABLED)
+        self.resume_button.config(state=tk.DISABLED)
+        self.cancel_button.config(state=tk.NORMAL)
+        self.is_downloading = True
+        
+        # Start download in separate thread with resume
+        def resume_worker():
+            import asyncio
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(
+                    self.downloader.download_photos_async(resume_session_id=session_id)
+                )
+            except Exception as e:
+                self.add_status_message(f"❌ Resume error: {e}")
+            finally:
+                self.root.after(0, self.download_complete)
+        
+        self.download_thread = threading.Thread(target=resume_worker, daemon=True)
+        self.download_thread.start()
+    
     def cancel_download(self):
         """Cancel the current download operation."""
         if self.is_downloading:
@@ -1014,6 +1301,7 @@ class GooglePhotosGUI:
         """Called when download is complete or cancelled."""
         self.is_downloading = False
         self.download_button.config(state=tk.NORMAL)
+        self.resume_button.config(state=tk.NORMAL)
         self.cancel_button.config(state=tk.DISABLED)
         
         if not self.downloader.cancelled:
