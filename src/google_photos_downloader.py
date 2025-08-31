@@ -1066,7 +1066,7 @@ class GooglePhotosGUI:
         self.end_date_picker.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
         
         # Album selection section
-        self.album_frame = ttk.LabelFrame(main_frame, text="Album Selection", padding="15")
+        self.album_frame = ttk.LabelFrame(self.main_frame, text="Album Selection", padding="15")
         self.album_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         self.album_frame.columnconfigure(1, weight=1)
         
@@ -1082,7 +1082,7 @@ class GooglePhotosGUI:
         refresh_albums_button.grid(row=0, column=2, padx=(5, 0), pady=5)
         
         # Media type filter section
-        filter_frame = ttk.LabelFrame(main_frame, text="Media Type Filter", padding="15")
+        filter_frame = ttk.LabelFrame(self.main_frame, text="Media Type Filter", padding="15")
         filter_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         
         self.photos_var = tk.BooleanVar(value=True)
@@ -1095,7 +1095,7 @@ class GooglePhotosGUI:
         videos_cb.grid(row=0, column=1, sticky=tk.W)
         
         # Destination folder section
-        dest_frame = ttk.LabelFrame(main_frame, text="Destination", padding="15")
+        dest_frame = ttk.LabelFrame(self.main_frame, text="Destination", padding="15")
         dest_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         dest_frame.columnconfigure(1, weight=1)
         
@@ -1109,7 +1109,7 @@ class GooglePhotosGUI:
         folder_button.grid(row=0, column=2, padx=(5, 0), pady=5)
         
         # Progress section
-        progress_frame = ttk.LabelFrame(main_frame, text="Download Progress", padding="15")
+        progress_frame = ttk.LabelFrame(self.main_frame, text="Download Progress", padding="15")
         progress_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         progress_frame.columnconfigure(0, weight=1)
         
@@ -1139,7 +1139,7 @@ class GooglePhotosGUI:
         self.eta_label.grid(row=1, column=2, sticky=tk.E)
         
         # Status section
-        status_frame = ttk.LabelFrame(main_frame, text="Status Log", padding="15")
+        status_frame = ttk.LabelFrame(self.main_frame, text="Status Log", padding="15")
         status_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
         status_frame.columnconfigure(0, weight=1)
         status_frame.rowconfigure(0, weight=1)
@@ -1160,7 +1160,7 @@ class GooglePhotosGUI:
         self.status_text.configure(yscrollcommand=scrollbar.set)
         
         # Control buttons
-        button_frame = ttk.Frame(main_frame)
+        button_frame = ttk.Frame(self.main_frame)
         button_frame.grid(row=8, column=0, columnspan=3, pady=(15, 0))
         
         self.download_button = ttk.Button(button_frame, text="🚀 Start Download", 
@@ -1198,14 +1198,26 @@ class GooglePhotosGUI:
     
     def on_source_type_changed(self):
         """Handle source type radio button changes."""
-        if self.source_type_var.get() == "date_range":
-            # Show date frame, hide album frame
-            for child in self.album_frame.winfo_children():
-                child.configure(state="disabled")
-        else:
-            # Hide date frame, show album frame
-            for child in self.album_frame.winfo_children():
-                child.configure(state="normal")
+        try:
+            if hasattr(self, 'album_frame'):  # Check if album_frame exists
+                if self.source_type_var.get() == "date_range":
+                    # Show date frame, disable album frame
+                    for child in self.album_frame.winfo_children():
+                        if hasattr(child, 'configure'):
+                            try:
+                                child.configure(state="disabled")
+                            except tk.TclError:
+                                pass  # Some widgets don't support state
+                else:
+                    # Show album frame, enable album controls
+                    for child in self.album_frame.winfo_children():
+                        if hasattr(child, 'configure'):
+                            try:
+                                child.configure(state="normal")
+                            except tk.TclError:
+                                pass  # Some widgets don't support state
+        except Exception as e:
+            print(f"Error in on_source_type_changed: {e}")
     
     def refresh_albums(self):
         """Refresh the album list from Google Photos."""

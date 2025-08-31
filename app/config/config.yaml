@@ -1,0 +1,24 @@
+advanced:
+  cleanup_temp_files: true
+  enable_logging: true
+  log_level: INFO
+  state_persistence: true
+api:
+  page_size: 100
+  rate_limit_delay: 0.1
+download:
+  chunk_size: 8192
+  max_workers: 5
+  retry_attempts: 3
+  timeout: 30
+files:
+  create_date_folders: false
+  duplicate_detection: true
+  naming_pattern: '{timestamp}_{filename}'
+security:
+  secure_token_storage: true
+  verify_checksums: true
+ui:
+  auto_refresh_albums: true
+  remember_window_size: true
+  theme: light
