@@ -8,9 +8,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import router
-from api.websockets import ConnectionManager
-from core.config import ConfigManager
+from app.api.routes import router
+from app.api.websockets import ConnectionManager
+from app.core.config import ConfigManager
 
 # Global instances
 config = ConfigManager()

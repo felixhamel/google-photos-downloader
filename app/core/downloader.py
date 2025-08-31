@@ -22,8 +22,7 @@ try:
 except ImportError:
     GOOGLE_APIS_AVAILABLE = False
 
-from core.session import DownloadSession
-from core.config import ConfigManager
+from app.core.config import ConfigManager
 
 # Google Photos API scope
 SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly']
