@@ -86,6 +86,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import hashlib
 
 # Import calendar widget
 try:
@@ -354,8 +356,8 @@ class GooglePhotosDownloader:
             self.update_status(f"❌ Unexpected error downloading {item.get('filename', 'unknown')}: {e}")
             return False, 0
     
-    async def download_photos_async(self, start_date: datetime, end_date: datetime, output_dir: str) -> None:
-        """Main async method to download photos from date range."""
+    async def download_photos_async(self, start_date: datetime, end_date: datetime, output_dir: str, max_workers: int = 5) -> None:
+        """Main async method to download photos from date range with concurrent downloads."""
         self.cancelled = False
         
         # Create output directory
@@ -375,33 +377,72 @@ class GooglePhotosDownloader:
         # Initialize statistics
         total_count = len(media_items)
         success_count = 0
+        failed_items = []
         self.stats.start(total_count)
         
-        self.update_status(f"📥 Starting download of {total_count} items...")
+        self.update_status(f"📥 Starting concurrent download of {total_count} items with {max_workers} workers...")
         
-        # Download each item
-        for i, item in enumerate(media_items, 1):
-            if self.cancelled:
-                self.update_status("🛑 Download cancelled by user")
-                break
+        # Use ThreadPoolExecutor for concurrent downloads
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all download tasks
+            future_to_item = {}
+            for i, item in enumerate(media_items, 1):
+                if self.cancelled:
+                    break
+                    
+                future = executor.submit(self._download_item_sync, item, output_path, i)
+                future_to_item[future] = (item, i)
             
-            filename = item.get('filename', f'item_{i}')
-            self.update_status(f"📸 Downloading {filename}...")
-            
-            success, file_size = await self.download_media_item_async(item, output_path)
-            if success:
-                success_count += 1
-                self.stats.update(file_size)
-            
-            # Update progress
-            percentage = (i / total_count) * 100
-            self.update_progress(i, total_count, percentage)
-            
-            # Small delay to prevent API rate limiting
-            time.sleep(0.1)
+            # Process completed downloads
+            completed = 0
+            for future in as_completed(future_to_item):
+                if self.cancelled:
+                    executor.shutdown(wait=False)
+                    self.update_status("🛑 Download cancelled by user")
+                    break
+                
+                item, index = future_to_item[future]
+                try:
+                    success, file_size = future.result()
+                    completed += 1
+                    
+                    if success:
+                        success_count += 1
+                        self.stats.update(file_size)
+                    else:
+                        failed_items.append(item.get('filename', f'item_{index}'))
+                    
+                    # Update progress
+                    percentage = (completed / total_count) * 100
+                    self.update_progress(completed, total_count, percentage)
+                    
+                except Exception as e:
+                    completed += 1
+                    failed_items.append(item.get('filename', f'item_{index}'))
+                    self.update_status(f"❌ Error downloading {item.get('filename', 'unknown')}: {e}")
+                    
+                    # Update progress even on failure
+                    percentage = (completed / total_count) * 100
+                    self.update_progress(completed, total_count, percentage)
         
         if not self.cancelled:
-            self.update_status(f"🎉 Download complete! {success_count}/{total_count} items saved to {output_path}")
+            if failed_items:
+                self.update_status(f"⚠️ Download complete with errors! {success_count}/{total_count} items saved. Failed: {', '.join(failed_items[:5])}{'...' if len(failed_items) > 5 else ''}")
+            else:
+                self.update_status(f"🎉 Download complete! {success_count}/{total_count} items saved to {output_path}")
+    
+    def _download_item_sync(self, item: Dict[str, Any], output_dir: Path, index: int) -> tuple[bool, int]:
+        """Synchronous wrapper for download_media_item_async for use with ThreadPoolExecutor."""
+        import asyncio
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(self.download_media_item_async(item, output_dir))
+        except Exception as e:
+            self.update_status(f"❌ Failed to download item {index}: {e}")
+            return False, 0
+        finally:
+            loop.close()
         
     def cancel_download(self):
         """Cancel the current download operation."""
