@@ -45,27 +45,31 @@ Write-Host "🔍 Checking and installing dependencies..." -ForegroundColor Yello
 Write-Host ""
 
 try {
-    if (Test-Path "requirements-web.txt") {
-        Write-Host "📦 Installing from requirements-web.txt..." -ForegroundColor Cyan
-        python -m pip install -r requirements-web.txt
+    # Use Windows-specific requirements (NO compilation needed)
+    if (Test-Path "requirements-web-windows.txt") {
+        Write-Host "📦 Installing Windows-compatible packages (NO Rust needed)..." -ForegroundColor Cyan
+        python -m pip install --only-binary=all -r requirements-web-windows.txt
+    } elseif (Test-Path "requirements-web.txt") {
+        Write-Host "📦 Installing from requirements-web.txt (binary only)..." -ForegroundColor Cyan
+        python -m pip install --only-binary=all -r requirements-web.txt
     } else {
-        Write-Host "⚡ Installing individual packages..." -ForegroundColor Cyan
+        Write-Host "⚡ Installing individual packages (Windows safe)..." -ForegroundColor Cyan
         $packages = @(
-            "fastapi>=0.104.0",
-            "uvicorn[standard]>=0.24.0", 
-            "pydantic>=2.0.0",
-            "python-multipart",
-            "websockets",
-            "google-auth-oauthlib>=1.0.0",
-            "google-auth-httplib2>=0.2.0",
-            "google-api-python-client>=2.0.0",
-            "requests>=2.31.0",
-            "python-dotenv"
+            "fastapi==0.100.1",
+            "uvicorn==0.23.2", 
+            "pydantic==1.10.13",
+            "python-multipart==0.0.6",
+            "websockets==11.0.3",
+            "google-auth-oauthlib==0.7.1",
+            "google-auth-httplib2==0.1.0",
+            "google-api-python-client==2.100.0",
+            "requests==2.31.0",
+            "python-dotenv==1.0.0"
         )
         
         foreach ($package in $packages) {
             Write-Host "Installing $package..." -ForegroundColor Gray
-            python -m pip install $package
+            python -m pip install --only-binary=all $package
             if ($LASTEXITCODE -ne 0) {
                 throw "Failed to install $package"
             }

@@ -42,22 +42,25 @@ echo.
 echo 🔍 Checking and installing dependencies...
 echo.
 
-:: Check if requirements file exists
-if exist "requirements-web.txt" (
+:: Use Windows-specific requirements (NO Rust/Cargo needed)
+if exist "requirements-web-windows.txt" (
+    echo 📦 Installing Windows-compatible packages...
+    python -m pip install --only-binary=all -r requirements-web-windows.txt
+) else if exist "requirements-web.txt" (
     echo 📦 Installing from requirements-web.txt...
-    python -m pip install -r requirements-web.txt
+    python -m pip install --only-binary=all -r requirements-web.txt
 ) else (
-    echo ⚡ Installing individual packages...
-    python -m pip install fastapi>=0.104.0
-    python -m pip install "uvicorn[standard]>=0.24.0"
-    python -m pip install pydantic>=2.0.0
-    python -m pip install python-multipart
-    python -m pip install websockets
-    python -m pip install google-auth-oauthlib>=1.0.0
-    python -m pip install google-auth-httplib2>=0.2.0
-    python -m pip install google-api-python-client>=2.0.0
-    python -m pip install requests>=2.31.0
-    python -m pip install python-dotenv
+    echo ⚡ Installing individual packages (Windows safe)...
+    python -m pip install --only-binary=all fastapi==0.100.1
+    python -m pip install --only-binary=all uvicorn==0.23.2
+    python -m pip install --only-binary=all pydantic==1.10.13
+    python -m pip install --only-binary=all python-multipart==0.0.6
+    python -m pip install --only-binary=all websockets==11.0.3
+    python -m pip install --only-binary=all google-auth-oauthlib==0.7.1
+    python -m pip install --only-binary=all google-auth-httplib2==0.1.0
+    python -m pip install --only-binary=all google-api-python-client==2.100.0
+    python -m pip install --only-binary=all requests==2.31.0
+    python -m pip install --only-binary=all python-dotenv==1.0.0
 )
 
 if errorlevel 1 (
