@@ -232,30 +232,113 @@ class GooglePhotosDownloader:
             'day': date_obj.day
         }
     
-    async def get_media_items_async(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
-        """Retrieve media items from Google Photos within date range."""
+    async def get_albums_async(self) -> List[Dict[str, Any]]:
+        """Retrieve list of albums from Google Photos."""
         if not self.service:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
         
-        start_str = start_date.strftime('%Y-%m-%d')
-        end_str = end_date.strftime('%Y-%m-%d')
-        self.update_status(f"🔍 Searching for photos from {start_str} to {end_str}...")
+        self.update_status("📚 Fetching albums...")
+        albums = []
+        page_token = None
         
-        # Build date filter
-        date_filter = {
-            'ranges': [{
-                'startDate': self.date_to_google_format(start_date),
-                'endDate': self.date_to_google_format(end_date)
-            }]
-        }
+        try:
+            while not self.cancelled:
+                if page_token:
+                    response = self.service.albums().list(pageToken=page_token, pageSize=50).execute()
+                else:
+                    response = self.service.albums().list(pageSize=50).execute()
+                
+                if 'albums' in response:
+                    batch = response['albums']
+                    albums.extend(batch)
+                    self.update_status(f"📊 Found {len(batch)} albums (total: {len(albums)})")
+                
+                page_token = response.get('nextPageToken')
+                if not page_token:
+                    break
+                    
+        except HttpError as e:
+            self.update_status(f"❌ API error fetching albums: {e}")
+            return albums
+        
+        self.update_status(f"✅ Found {len(albums)} albums")
+        return albums
+    
+    async def get_album_media_items_async(self, album_id: str) -> List[Dict[str, Any]]:
+        """Retrieve media items from a specific album."""
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+        
+        self.update_status(f"🔍 Searching for items in album...")
+        media_items = []
+        page_token = None
+        
+        try:
+            while not self.cancelled:
+                search_body = {
+                    'albumId': album_id,
+                    'pageSize': 100
+                }
+                
+                if page_token:
+                    search_body['pageToken'] = page_token
+                
+                response = self.service.mediaItems().search(body=search_body).execute()
+                
+                if 'mediaItems' in response:
+                    batch = response['mediaItems']
+                    media_items.extend(batch)
+                    self.update_status(f"📊 Found {len(batch)} items in batch (total: {len(media_items)})")
+                
+                page_token = response.get('nextPageToken')
+                if not page_token:
+                    break
+                    
+        except HttpError as e:
+            self.update_status(f"❌ API error during album search: {e}")
+            return media_items
+        
+        self.update_status(f"✅ Album search complete: {len(media_items)} items found")
+        return media_items
+    
+    async def get_media_items_async(self, start_date: datetime = None, end_date: datetime = None, 
+                                   album_id: str = None, media_types: List[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve media items from Google Photos with various filters."""
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+        
+        # If album_id is provided, use album-specific search
+        if album_id:
+            return await self.get_album_media_items_async(album_id)
+        
+        # Build search filters
+        filters = {}
+        
+        # Date filter
+        if start_date and end_date:
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+            self.update_status(f"🔍 Searching for photos from {start_str} to {end_str}...")
+            
+            filters['dateFilter'] = {
+                'ranges': [{
+                    'startDate': self.date_to_google_format(start_date),
+                    'endDate': self.date_to_google_format(end_date)
+                }]
+            }
+        
+        # Media type filter
+        if media_types:
+            filters['mediaTypeFilter'] = {
+                'mediaTypes': media_types
+            }
+        else:
+            filters['mediaTypeFilter'] = {
+                'mediaTypes': ['PHOTO', 'VIDEO']
+            }
         
         search_body = {
-            'filters': {
-                'dateFilter': date_filter,
-                'mediaTypeFilter': {
-                    'mediaTypes': ['PHOTO', 'VIDEO']
-                }
-            },
+            'filters': filters,
             'pageSize': 100
         }
         
@@ -356,19 +439,28 @@ class GooglePhotosDownloader:
             self.update_status(f"❌ Unexpected error downloading {item.get('filename', 'unknown')}: {e}")
             return False, 0
     
-    async def download_photos_async(self, start_date: datetime, end_date: datetime, output_dir: str, max_workers: int = 5) -> None:
-        """Main async method to download photos from date range with concurrent downloads."""
+    async def download_photos_async(self, start_date: datetime = None, end_date: datetime = None, 
+                                   output_dir: str = None, max_workers: int = 5, 
+                                   album_id: str = None, media_types: List[str] = None) -> None:
+        """Main async method to download photos with various filters and concurrent downloads."""
         self.cancelled = False
         
         # Create output directory
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
-        # Get media items
-        media_items = await self.get_media_items_async(start_date, end_date)
+        # Get media items based on filters
+        if album_id:
+            media_items = await self.get_media_items_async(album_id=album_id)
+        elif start_date and end_date:
+            media_items = await self.get_media_items_async(start_date, end_date, media_types=media_types)
+        else:
+            self.update_status("❌ Either date range or album must be specified")
+            return
         
         if not media_items:
-            self.update_status("📭 No photos found in the specified date range.")
+            source_desc = f"album" if album_id else f"date range {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+            self.update_status(f"📭 No photos found in the specified {source_desc}.")
             return
         
         if self.cancelled:
@@ -380,7 +472,8 @@ class GooglePhotosDownloader:
         failed_items = []
         self.stats.start(total_count)
         
-        self.update_status(f"📥 Starting concurrent download of {total_count} items with {max_workers} workers...")
+        source_desc = f"album" if album_id else "date range"
+        self.update_status(f"📥 Starting concurrent download of {total_count} items from {source_desc} with {max_workers} workers...")
         
         # Use ThreadPoolExecutor for concurrent downloads
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -490,9 +583,26 @@ class GooglePhotosGUI:
                                font=('Arial', 18, 'bold'))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 25))
         
+        # Source selection section
+        source_frame = ttk.LabelFrame(main_frame, text="Download Source", padding="15")
+        source_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        source_frame.columnconfigure(1, weight=1)
+        
+        # Source type selection
+        self.source_type_var = tk.StringVar(value="date_range")
+        date_radio = ttk.Radiobutton(source_frame, text="📅 Date Range", 
+                                   variable=self.source_type_var, value="date_range",
+                                   command=self.on_source_type_changed)
+        date_radio.grid(row=0, column=0, sticky=tk.W, pady=5)
+        
+        album_radio = ttk.Radiobutton(source_frame, text="📚 Album", 
+                                    variable=self.source_type_var, value="album",
+                                    command=self.on_source_type_changed)
+        album_radio.grid(row=0, column=1, sticky=tk.W, pady=5)
+        
         # Date selection section
         date_frame = ttk.LabelFrame(main_frame, text="Date Range", padding="15")
-        date_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        date_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         date_frame.columnconfigure(1, weight=1)
         
         # Start date
@@ -519,9 +629,38 @@ class GooglePhotosGUI:
             self.end_date_picker = ttk.Entry(date_frame, textvariable=self.end_date_var, width=15)
         self.end_date_picker.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
         
+        # Album selection section
+        self.album_frame = ttk.LabelFrame(main_frame, text="Album Selection", padding="15")
+        self.album_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        self.album_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(self.album_frame, text="Album:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        
+        self.album_var = tk.StringVar()
+        self.album_combobox = ttk.Combobox(self.album_frame, textvariable=self.album_var, 
+                                          state="readonly", width=40)
+        self.album_combobox.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
+        
+        refresh_albums_button = ttk.Button(self.album_frame, text="🔄 Refresh", 
+                                         command=self.refresh_albums)
+        refresh_albums_button.grid(row=0, column=2, padx=(5, 0), pady=5)
+        
+        # Media type filter section
+        filter_frame = ttk.LabelFrame(main_frame, text="Media Type Filter", padding="15")
+        filter_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        
+        self.photos_var = tk.BooleanVar(value=True)
+        self.videos_var = tk.BooleanVar(value=True)
+        
+        photos_cb = ttk.Checkbutton(filter_frame, text="📷 Photos", variable=self.photos_var)
+        photos_cb.grid(row=0, column=0, sticky=tk.W, padx=(0, 20))
+        
+        videos_cb = ttk.Checkbutton(filter_frame, text="🎥 Videos", variable=self.videos_var)
+        videos_cb.grid(row=0, column=1, sticky=tk.W)
+        
         # Destination folder section
         dest_frame = ttk.LabelFrame(main_frame, text="Destination", padding="15")
-        dest_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        dest_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         dest_frame.columnconfigure(1, weight=1)
         
         ttk.Label(dest_frame, text="Folder:").grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -535,7 +674,7 @@ class GooglePhotosGUI:
         
         # Progress section
         progress_frame = ttk.LabelFrame(main_frame, text="Download Progress", padding="15")
-        progress_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        progress_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         progress_frame.columnconfigure(0, weight=1)
         
         # Progress bar
@@ -565,7 +704,7 @@ class GooglePhotosGUI:
         
         # Status section
         status_frame = ttk.LabelFrame(main_frame, text="Status Log", padding="15")
-        status_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
+        status_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
         status_frame.columnconfigure(0, weight=1)
         status_frame.rowconfigure(0, weight=1)
         
@@ -585,7 +724,7 @@ class GooglePhotosGUI:
         
         # Control buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=5, column=0, columnspan=3, pady=(15, 0))
+        button_frame.grid(row=8, column=0, columnspan=3, pady=(15, 0))
         
         self.download_button = ttk.Button(button_frame, text="🚀 Start Download", 
                                         command=self.start_download)
@@ -596,10 +735,14 @@ class GooglePhotosGUI:
         self.cancel_button.pack(side=tk.LEFT)
         
         # Configure main_frame row weights for proper resizing
-        main_frame.rowconfigure(4, weight=1)
+        main_frame.rowconfigure(7, weight=1)
+        
+        # Initialize UI state
+        self.albums = []
+        self.on_source_type_changed()  # Set initial state
         
         # Add initial status message
-        self.add_status_message("🎯 Ready to download! Select your date range and destination folder.")
+        self.add_status_message("🎯 Ready to download! Select your date range/album and destination folder.")
         
         # Check for credentials file
         if not os.path.exists('credentials.json'):
@@ -611,6 +754,53 @@ class GooglePhotosGUI:
             progress_callback=self.update_progress_gui,
             status_callback=self.add_status_message
         )
+    
+    def on_source_type_changed(self):
+        """Handle source type radio button changes."""
+        if self.source_type_var.get() == "date_range":
+            # Show date frame, hide album frame
+            for child in self.album_frame.winfo_children():
+                child.configure(state="disabled")
+        else:
+            # Hide date frame, show album frame
+            for child in self.album_frame.winfo_children():
+                child.configure(state="normal")
+    
+    def refresh_albums(self):
+        """Refresh the album list from Google Photos."""
+        if not self.downloader.service:
+            if not self.downloader.authenticate():
+                self.add_status_message("❌ Authentication failed. Cannot refresh albums.")
+                return
+        
+        self.add_status_message("🔄 Refreshing albums...")
+        
+        def fetch_albums():
+            try:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                albums = loop.run_until_complete(self.downloader.get_albums_async())
+                loop.close()
+                
+                self.root.after(0, lambda: self._update_album_list(albums))
+            except Exception as e:
+                self.root.after(0, lambda: self.add_status_message(f"❌ Error fetching albums: {e}"))
+        
+        threading.Thread(target=fetch_albums, daemon=True).start()
+    
+    def _update_album_list(self, albums):
+        """Update the album dropdown with fetched albums."""
+        self.albums = albums
+        album_names = [f"{album.get('title', 'Untitled')} ({album.get('mediaItemsCount', '?')} items)" 
+                      for album in albums]
+        
+        self.album_combobox['values'] = album_names
+        if album_names:
+            self.album_combobox.current(0)
+            self.add_status_message(f"✅ Loaded {len(albums)} albums")
+        else:
+            self.add_status_message("📭 No albums found")
     
     def browse_folder(self):
         """Open folder selection dialog."""
@@ -677,20 +867,33 @@ class GooglePhotosGUI:
     def validate_inputs(self) -> bool:
         """Validate user inputs before starting download."""
         try:
-            start_dt, end_dt = self.get_date_values()
+            source_type = self.source_type_var.get()
             
-            if start_dt > end_dt:
-                messagebox.showerror("Invalid Dates", "Start date cannot be after end date.")
-                return False
-            
-            # Check if date range is reasonable (not more than 5 years)
-            days_diff = (end_dt - start_dt).days
-            if days_diff > 1825:  # 5 years
-                result = messagebox.askyesno("Large Date Range", 
-                    f"You've selected {days_diff} days ({days_diff//365} years). "
-                    "This might result in thousands of photos. Continue?")
-                if not result:
+            if source_type == "date_range":
+                start_dt, end_dt = self.get_date_values()
+                
+                if start_dt > end_dt:
+                    messagebox.showerror("Invalid Dates", "Start date cannot be after end date.")
                     return False
+                
+                # Check if date range is reasonable (not more than 5 years)
+                days_diff = (end_dt - start_dt).days
+                if days_diff > 1825:  # 5 years
+                    result = messagebox.askyesno("Large Date Range", 
+                        f"You've selected {days_diff} days ({days_diff//365} years). "
+                        "This might result in thousands of photos. Continue?")
+                    if not result:
+                        return False
+            else:
+                # Album mode - check if album is selected
+                if not self.album_var.get():
+                    messagebox.showerror("No Album Selected", "Please select an album from the dropdown.")
+                    return False
+            
+            # Check media type filters
+            if not self.photos_var.get() and not self.videos_var.get():
+                messagebox.showerror("No Media Types", "Please select at least photos or videos to download.")
+                return False
             
             # Validate folder
             folder = self.folder_var.get().strip()
@@ -721,10 +924,37 @@ class GooglePhotosGUI:
             if not self.downloader.authenticate():
                 return
             
-            start_dt, end_dt = self.get_date_values()
+            source_type = self.source_type_var.get()
             output_dir = self.folder_var.get()
             
-            await self.downloader.download_photos_async(start_dt, end_dt, output_dir)
+            # Build media type filter
+            media_types = []
+            if self.photos_var.get():
+                media_types.append('PHOTO')
+            if self.videos_var.get():
+                media_types.append('VIDEO')
+            
+            if source_type == "date_range":
+                start_dt, end_dt = self.get_date_values()
+                await self.downloader.download_photos_async(
+                    start_date=start_dt, 
+                    end_date=end_dt, 
+                    output_dir=output_dir,
+                    media_types=media_types
+                )
+            else:
+                # Album mode
+                selected_index = self.album_combobox.current()
+                if selected_index >= 0 and selected_index < len(self.albums):
+                    selected_album = self.albums[selected_index]
+                    album_id = selected_album['id']
+                    await self.downloader.download_photos_async(
+                        output_dir=output_dir,
+                        album_id=album_id
+                    )
+                else:
+                    self.add_status_message("❌ Invalid album selection")
+                    return
             
         except Exception as e:
             self.add_status_message(f"❌ Unexpected error: {e}")
