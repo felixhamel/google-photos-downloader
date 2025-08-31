@@ -18,6 +18,8 @@ class FullProjectTester:
         self.passed = 0
         self.failed = 0
         self.warnings = 0
+        # Change to project root for testing (parent directory)
+        os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     def test(self, name: str, func) -> bool:
         """Run a test and track results."""
@@ -73,9 +75,9 @@ class FullProjectTester:
             "static/index.html",
             "static/js/app.js",
             
-            # Launch scripts
-            "run_web_windows_fixed.bat",
-            "run_web_macos.sh",
+            # Launch scripts (moved to scripts/launchers)
+            "scripts/launchers/run_web_windows_fixed.bat",
+            "scripts/launchers/run_web_macos.sh",
             
             # Requirements
             "requirements.txt",
@@ -88,9 +90,9 @@ class FullProjectTester:
             "DEPLOYMENT_GUIDE.md",
             "INSTALL_WINDOWS.md",
             
-            # Test scripts
-            "test_setup.py",
-            "test_full_project.py"
+            # Test scripts (moved to tests/)
+            "tests/test_setup.py",
+            "tests/test_full_project.py"
         ]
         
         missing = []
@@ -216,8 +218,8 @@ class FullProjectTester:
         """Test launch scripts exist and are valid."""
         scripts = [
             ("start_server.py", False),
-            ("run_web_windows_fixed.bat", False),
-            ("run_web_macos.sh", True),  # Should be executable
+            ("scripts/launchers/run_web_windows_fixed.bat", False),
+            ("scripts/launchers/run_web_macos.sh", True),  # Should be executable
             ("cli_mode.py", False)
         ]
         

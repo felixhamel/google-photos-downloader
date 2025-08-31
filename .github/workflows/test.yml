@@ -46,4 +46,4 @@ jobs:
         
     - name: Run validation script
       run: |
-        python test_full_project.py
+        python tests/test_full_project.py

@@ -83,9 +83,15 @@ The app only has read-only access to your Google Photos - it can't modify or del
 ```
 ├── start_server.py              # Web interface launcher
 ├── cli_mode.py                  # Command line interface  
-├── src/google_photos_downloader.py  # Original GUI
+├── version.py                   # Version information
 ├── app/                         # Web application code
 ├── static/                      # Web interface files
+├── scripts/                     # Utility scripts
+│   ├── launchers/              # Platform-specific launchers
+│   ├── build/                  # Build and packaging scripts
+│   └── archive/                # Legacy/experimental scripts
+├── tests/                       # Test scripts
+├── src/                         # Original GUI source
 └── requirements-*.txt           # Dependencies
 ```
 

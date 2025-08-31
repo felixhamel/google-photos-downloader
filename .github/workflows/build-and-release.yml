@@ -48,7 +48,7 @@ jobs:
         
     - name: Build executable
       run: |
-        python build_exe.py
+        python scripts/build/build_exe.py
         
     - name: Verify executable exists
       shell: bash

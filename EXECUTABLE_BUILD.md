@@ -93,7 +93,7 @@ The executable is built using PyInstaller with this configuration:
 To rebuild the executable yourself:
 
 ```bash
-python build_exe.py
+python scripts/build/build_exe.py
 ```
 
 This creates a fresh `distribution/` folder with the latest version.

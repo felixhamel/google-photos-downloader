@@ -7,6 +7,7 @@ __pycache__/
 *.so
 .Python
 build/
+!scripts/build/
 develop-eggs/
 dist/
 downloads/
@@ -91,7 +92,7 @@ coverage.xml
 *.cover
 .hypothesis/
 
-# Build and Distribution
+# Build and Distribution (but allow scripts/build/)
 *.exe
 *.dmg
 *.app
@@ -99,6 +100,7 @@ coverage.xml
 *.rpm
 *.pkg
 *.msi
+!scripts/build/
 
 # Development Tools
 .mypy_cache/
