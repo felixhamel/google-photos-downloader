@@ -1,41 +1,38 @@
-# 🪟 Installation Windows - Google Photos Downloader
+# Windows Installation Guide
 
-## ❌ PROBLÈME RUST/CARGO RÉSOLU
+## Fixing "Rust/Cargo compilation required" errors
 
-Si tu vois des erreurs mentionnant **Rust**, **Cargo**, ou **compilation required**, c'est parce que certaines versions récentes de packages Python nécessitent de la compilation.
+If you see errors about **Rust**, **Cargo**, or **compilation required**, it's because some newer Python packages need to be compiled from source. Here's how to fix it:
 
-## ✅ SOLUTION SIMPLE
+## Quick fix (recommended)
 
-### Option 1: Script Automatique (RECOMMANDÉ)
+Just double-click on `run_web_windows_fixed.bat` - it handles everything automatically.
+
+Or run these commands:
+
 ```cmd
-# Double-clic sur un de ces fichiers:
-run_web_windows_fixed.bat      # Script batch simple
-run_web_macos.sh               # Script shell (macOS/Linux)
-python start_server.py         # Script Python universel
-python cli_mode.py --help      # Mode CLI complet
-```
-
-### Option 2: Installation Manuelle
-```cmd
-# Utilise les dépendances Windows (pas de compilation)
+# Use pre-compiled packages only
 pip install --only-binary=all -r requirements-web-windows.txt
 
-# OU versions spécifiques sans compilation:
+# Start the app
+python start_server.py
+```
+
+## Manual installation
+
+If the automatic script doesn't work:
+
+```cmd
 pip install --only-binary=all fastapi==0.100.1
-pip install --only-binary=all uvicorn==0.23.2
+pip install --only-binary=all uvicorn==0.23.2  
 pip install --only-binary=all pydantic==1.10.13
 pip install --only-binary=all python-multipart==0.0.6
 pip install --only-binary=all websockets==11.0.3
 pip install --only-binary=all google-auth-oauthlib==0.7.1
-pip install --only-binary=all google-auth-httplib2==0.1.0
-pip install --only-binary=all google-api-python-client==2.100.0
 pip install --only-binary=all requests==2.31.0
-pip install --only-binary=all python-dotenv==1.0.0
 ```
 
-## 🔧 Pourquoi `--only-binary=all` ?
-
-Cette option force pip à utiliser **seulement des packages pré-compilés** (wheels), évitant toute compilation qui nécessiterait Rust/Cargo.
+The `--only-binary=all` flag tells pip to only use pre-compiled packages, avoiding any compilation that would need Rust or other build tools.
 
 ## 🚀 Modes d'Utilisation
 

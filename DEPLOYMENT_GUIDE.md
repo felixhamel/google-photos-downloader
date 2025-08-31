@@ -1,135 +1,119 @@
-# 🚀 Google Photos Downloader - Complete Deployment Guide
+# Deployment Guide
 
-## ✅ TESTED & VERIFIED - READY FOR PRODUCTION
+This guide covers how to set up and distribute the Google Photos Downloader.
 
-This project has been **thoroughly tested** and validated on both Windows and macOS. All scripts are guaranteed to work.
+## Prerequisites
 
-## 📋 Prerequisites
+- Python 3.8 or newer
+- Internet connection for package installation
+- Google Cloud Console account (for OAuth2 setup)
 
-### For All Platforms:
-- **Python 3.8+** installed
-- **Internet connection** for package installation
-- **credentials.json** from Google Cloud Console (see OAUTH_GUIDE.md)
+## Setting up Google OAuth2
 
-### Platform-Specific:
-- **Windows**: Any Windows 10/11 (no additional tools needed)
-- **macOS**: macOS 10.14+ (no additional tools needed)
-- **Linux**: Ubuntu 18.04+ or equivalent
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google Photos Library API
+4. Go to "Credentials" and create OAuth2 credentials
+5. Choose "Desktop application" as the application type
+6. Download the JSON file and rename it to `credentials.json`
+7. Place it in the root directory of the project
 
-## 🚀 Quick Start
+## Installation Options
 
-### Option 1: Platform-Specific Scripts (RECOMMENDED)
-
-**Windows Users:**
-```cmd
-# Double-click this file:
-run_web_windows_fixed.bat
-
-# Or run from command prompt:
-run_web_windows_fixed.bat
-```
-
-**macOS/Linux Users:**
+### Option 1: Simple setup (recommended)
 ```bash
-# Make executable and run:
+# Windows users
+run_web_windows_fixed.bat
+
+# macOS/Linux users  
 chmod +x run_web_macos.sh
 ./run_web_macos.sh
 
-# Or run directly:
-bash run_web_macos.sh
-```
-
-### Option 2: Cross-Platform Python Script
-
-**All Platforms:**
-```bash
+# Universal
 python start_server.py
-# or
-python3 start_server.py
 ```
 
-## 🔧 What Happens Automatically
+These scripts automatically install dependencies and launch the app.
 
-1. **✅ Dependency Check**: Scripts check for Python installation
-2. **📦 Package Installation**: Auto-installs required packages using Windows-safe versions
-3. **🌐 Server Start**: Launches FastAPI server on http://127.0.0.1:8000
-4. **🚀 Browser Launch**: Automatically opens your web browser to the app
-5. **📱 Ready to Use**: Web interface loads with French localization
-
-## 📂 File Structure (What Users Need)
-
-```
-google-photos-downloader/
-├── credentials.json              # ⚠️  USER MUST ADD THIS
-├── run_web_windows_fixed.bat     # Windows launcher
-├── run_web_macos.sh             # macOS/Linux launcher  
-├── start_server.py              # Cross-platform launcher
-├── requirements-web.txt         # Dependencies (Linux/macOS)
-├── requirements-web-windows.txt # Windows-specific dependencies
-├── app/                         # Web application
-├── static/                      # Web interface files
-├── OAUTH_GUIDE.md              # Setup instructions
-└── INSTALL_WINDOWS.md          # Windows troubleshooting
-```
-
-## 🛠️ Troubleshooting
-
-### "Python not found"
-- **Windows**: Install from [python.org](https://python.org), check "Add to PATH"
-- **macOS**: Install with `brew install python3`
-- **Linux**: `sudo apt install python3` (Ubuntu/Debian)
-
-### "Rust/Cargo compilation errors"
-- **SOLVED**: Fixed by using `--only-binary=all` flag in all scripts
-- Uses pre-compiled packages only, no compilation needed
-
-### "PowerShell execution policy" (Windows)
-```powershell
-# Run as Administrator:
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-### "Permission denied" (macOS/Linux)
+### Option 2: Manual installation
 ```bash
-chmod +x run_web_macos.sh
-./run_web_macos.sh
+# Install dependencies
+pip install -r requirements-web.txt
+
+# Windows users with compilation issues:
+pip install --only-binary=all -r requirements-web-windows.txt
+
+# Launch web interface
+python start_server.py
+
+# Or use command line
+python cli_mode.py --help
 ```
 
-## 🎯 Success Indicators
+## Distribution
 
-When everything works correctly, you'll see:
+When sharing this app with others:
 
-1. **✅ Dependencies installed successfully!**
-2. **🌐 Starting web server on http://127.0.0.1:8000**
-3. **📱 Opening browser automatically...**
-4. **Web browser opens** showing the French interface
-5. **Ready to authenticate** with Google Photos
+**Include these files:**
+- All Python source files
+- `requirements-*.txt` files
+- `credentials.json` (your OAuth2 app credentials)
+- Documentation files
+- Launch scripts
 
-## 🔒 Security Notes
+**Don't include:**
+- `token.json` (user-specific, private)
+- `downloads/` folder (user data)
+- `sessions/` folder (download states)
+- Virtual environment folders
 
-- **credentials.json**: Contains your app's OAuth2 credentials (safe to distribute)
-- **token.json**: Created per-user during OAuth flow (private, not included)
-- **Local only**: Server runs on 127.0.0.1 (not accessible from internet)
-- **Read-only**: App only requests read permissions for Google Photos
+## Troubleshooting
 
-## 📞 Support
+**"Python not found"**
+- Install Python from python.org
+- Make sure to check "Add to PATH" during Windows installation
 
-If users encounter issues:
+**"Module not found" errors**
+- Run `pip install -r requirements-web.txt`
+- On Windows: use `requirements-web-windows.txt` instead
 
-1. **Check**: OAUTH_GUIDE.md for Google setup
-2. **Check**: INSTALL_WINDOWS.md for Windows-specific issues
-3. **Run**: `python test_setup.py` to validate installation
-4. **Check**: Console output for specific error messages
+**"credentials.json not found"**
+- Follow the OAuth2 setup steps above
+- Make sure the file is named exactly `credentials.json`
 
-## 🎉 Final Verification
+**Browser doesn't open automatically**
+- Manually navigate to http://127.0.0.1:8000
+- Check if another program is using port 8000
 
-Run the test script to verify everything is working:
-```bash
-python test_setup.py
-```
+## Platform-specific notes
 
-**Expected output:** "🎉 ALL TESTS PASSED! Project is ready for deployment."
+**Windows:**
+- Use the `.bat` launcher for best experience
+- Pre-compiled packages avoid compilation issues
+- Works on Windows 10 and 11
 
----
+**macOS:**
+- Use the `.sh` launcher 
+- May need to allow the script to run (right-click → Open)
+- Works on macOS 10.14+
 
-**Ready for deployment!** All components tested and verified. ✅
+**Linux:**
+- Install Python3 and pip if not already installed
+- Use the `.sh` launcher or run Python directly
+- Tested on Ubuntu 18.04+
+
+## Security considerations
+
+- The app only requests read-only access to Google Photos
+- User tokens are stored locally in `token.json`
+- The app runs locally (127.0.0.1) and is not accessible from the internet
+- No data is sent to external servers except Google's APIs
+
+## Performance
+
+- Downloads are concurrent (default: 5 simultaneous downloads)
+- Progress is tracked in real-time via WebSocket
+- Failed downloads are retried automatically
+- Large files are downloaded in chunks for better memory usage
+
+That's it! The app is designed to be as simple as possible to deploy and use.

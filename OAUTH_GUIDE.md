@@ -1,52 +1,43 @@
-# Guide OAuth2 - Google Photos Downloader
+# Google OAuth2 Setup Guide
 
-## 🔐 Architecture de Sécurité OAuth2
+## How OAuth2 works for this app
 
-### Comprendre les Credentials vs Tokens
+### Understanding the files
 
-#### **credentials.json (Développeur)**
-- **Propriétaire** : Le développeur de l'application (toi)
-- **Contenu** : `client_id`, `client_secret`, configuration de l'app
-- **Usage** : Identifier l'application auprès de Google
-- **Sécurité** : Peut être distribué avec l'app (non-sensible)
-- **Durée** : Permanent jusqu'à révocation manuelle
+**credentials.json** (from the developer)
+- Contains app identification info (`client_id`, `client_secret`)
+- Tells Google which application is requesting access
+- Safe to distribute with the app
+- Stays the same for all users
 
-#### **token.json (Utilisateur Final)**
-- **Propriétaire** : L'utilisateur spécifique qui se connecte
-- **Contenu** : `access_token`, `refresh_token` pour cet utilisateur
-- **Usage** : Accéder aux données Google Photos de CET utilisateur
-- **Sécurité** : PRIVÉ - ne jamais partager
-- **Durée** : Expire et se renouvelle automatiquement
+**token.json** (created for each user)  
+- Contains your personal access tokens
+- Created when you log in and authorize the app
+- Private to your Google account - never share this
+- Automatically refreshes when needed
 
-## 🎯 Flow OAuth2 Complet
+## How the OAuth flow works
 
-### Phase 1 : Configuration Développeur (Une seule fois)
-```bash
-1. Créer projet Google Cloud Console
-2. Activer Google Photos Library API
-3. Créer credentials OAuth2 (Desktop Application)
-4. Télécharger credentials.json
-5. Distribuer l'app avec credentials.json
-```
+### Step 1: Developer setup (done once)
+1. Create project in Google Cloud Console
+2. Enable Google Photos Library API  
+3. Create OAuth2 credentials (Desktop Application type)
+4. Download credentials.json
+5. Include it with the app
 
-### Phase 2 : Authentification Utilisateur (À chaque utilisateur)
-```bash
-1. Utilisateur lance l'app
-2. App utilise credentials.json pour initier OAuth
-3. Navigateur s'ouvre → Page de connexion Google
-4. Utilisateur se connecte avec SON compte Google
-5. Google demande : "Autoriser [Nom App] à accéder à vos photos ?"
-6. Si accepté → Google génère token.json spécifique à cet utilisateur
-7. App peut maintenant accéder aux photos de CET utilisateur
-```
+### Step 2: User authentication (each user does this)
+1. User runs the app for first time
+2. App opens browser to Google login page
+3. User logs in with their Google account
+4. Google asks: "Allow this app to access your photos?"
+5. If user clicks "Allow", Google creates a token.json file
+6. App can now access that user's photos
 
-### Phase 3 : Utilisation Continue
-```bash
-1. App charge token.json existant
-2. Si token expiré → Refresh automatique via refresh_token
-3. Si refresh_token expiré → Refaire le flow OAuth complet
-4. Accès aux photos de l'utilisateur authentifié
-```
+### Step 3: Ongoing use
+1. App loads existing token.json
+2. If token expired, automatically refreshes it
+3. If refresh fails, user needs to re-authorize
+4. App accesses the authenticated user's photos
 
 ## 🚀 Scénarios d'Usage
 
