@@ -91,6 +91,7 @@ import hashlib
 import pickle
 import uuid
 import yaml
+import enum
 
 # Import calendar widget
 try:
@@ -114,6 +115,56 @@ except ImportError:
 
 # Google Photos API scope
 SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly']
+
+class CircuitBreakerState(enum.Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+class CircuitBreaker:
+    """Simple circuit breaker pattern for handling API failures."""
+    
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = CircuitBreakerState.CLOSED
+    
+    def call(self, func, *args, **kwargs):
+        """Call a function through the circuit breaker."""
+        if self.state == CircuitBreakerState.OPEN:
+            if self._should_attempt_reset():
+                self.state = CircuitBreakerState.HALF_OPEN
+            else:
+                raise Exception("Circuit breaker is OPEN - too many recent failures")
+        
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise e
+    
+    def _should_attempt_reset(self) -> bool:
+        """Check if enough time has passed to attempt reset."""
+        if self.last_failure_time is None:
+            return True
+        return (time.time() - self.last_failure_time) >= self.recovery_timeout
+    
+    def _on_success(self):
+        """Handle successful operation."""
+        self.failure_count = 0
+        self.state = CircuitBreakerState.CLOSED
+    
+    def _on_failure(self):
+        """Handle failed operation."""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitBreakerState.OPEN
 
 class ConfigManager:
     """Manages application configuration from YAML file."""
@@ -388,6 +439,7 @@ class GooglePhotosDownloader:
         self.stats = DownloadStats()
         self.current_session = None
         self.config = config or ConfigManager()
+        self.circuit_breaker = CircuitBreaker()
         
     def set_callbacks(self, progress_callback: Optional[Callable] = None, 
                      status_callback: Optional[Callable] = None):
@@ -659,21 +711,37 @@ class GooglePhotosDownloader:
                     return False, 0
                     
                 try:
-                    response = requests.get(download_url, stream=True, timeout=30)
+                    timeout = self.config.get('download.timeout', 30)
+                    chunk_size = self.config.get('download.chunk_size', 8192)
+                    
+                    response = requests.get(download_url, stream=True, timeout=timeout)
                     response.raise_for_status()
+                    
+                    # Get content length for progress tracking
+                    content_length = response.headers.get('content-length')
+                    total_size = int(content_length) if content_length else None
                     
                     # Create temporary file first
                     temp_file = file_path.with_suffix(f"{file_path.suffix}.tmp")
                     file_size = 0
                     
+                    # Use larger buffer for big files (>50MB)
+                    if total_size and total_size > 50 * 1024 * 1024:
+                        chunk_size = min(chunk_size * 16, 128 * 1024)  # Up to 128KB chunks
+                    
                     with open(temp_file, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=8192):
+                        for chunk in response.iter_content(chunk_size=chunk_size):
                             if self.cancelled:
                                 f.close()
                                 temp_file.unlink(missing_ok=True)
                                 return False, 0
                             f.write(chunk)
                             file_size += len(chunk)
+                            
+                            # Optional: Progress callback for individual files
+                            if total_size and hasattr(self, 'file_progress_callback'):
+                                progress = (file_size / total_size) * 100
+                                self.file_progress_callback(filename, progress)
                     
                     # Calculate checksum of downloaded file
                     downloaded_checksum = self._calculate_file_checksum(temp_file)
