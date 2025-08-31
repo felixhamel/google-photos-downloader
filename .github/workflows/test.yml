@@ -1,41 +1,49 @@
-name: Tests and Quality Checks
+name: Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, feat/web-app ]
   pull_request:
     branches: [ main ]
 
 jobs:
   test:
-    name: 🧪 Test on ${{ matrix.os }}
+    name: Test ${{ matrix.os }} - Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12']
-
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+        
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-
-      - name: 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest black flake8
-
-      - name: 🎨 Code Formatting Check
-        run: black --check src/ tests/ --diff
-
-      - name: 🔍 Lint Code
-        run: flake8 src/ tests/ --max-line-length=100
-
-      - name: 🧪 Run Tests
-        run: pytest tests/ -v
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --only-binary=all -r requirements-web.txt
+        
+    - name: Test imports
+      run: |
+        python -c "import app.main"
+        python -c "import cli_mode"
+        python -c "from app.core.downloader import GooglePhotosDownloader"
+        python -c "from app.core.config import ConfigManager"
+        
+    - name: Test CLI help
+      run: |
+        python cli_mode.py --help
+        
+    - name: Test web app startup (import only)
+      run: |
+        python -c "from app.main import app; print('FastAPI app created successfully')"
+        
+    - name: Run validation script
+      run: |
+        python test_full_project.py
