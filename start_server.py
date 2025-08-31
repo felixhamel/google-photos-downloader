@@ -12,6 +12,10 @@ from pathlib import Path
 
 def main():
     """Launch the web server and open browser."""
+    # Check if CLI mode was requested
+    if len(sys.argv) > 1 and (sys.argv[1] == '--cli' or sys.argv[1] == '--help'):
+        return launch_cli_mode()
+    
     print("🚀 Google Photos Downloader - Web Version v2.0.0")
     print("=" * 50)
     
@@ -125,6 +129,20 @@ def install_and_restart():
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         input("Press Enter to exit...")
+        return 1
+
+def launch_cli_mode():
+    """Launch CLI mode."""
+    try:
+        # Import and run CLI mode
+        import cli_mode
+        import asyncio
+        return asyncio.run(cli_mode.main())
+    except ImportError:
+        print("❌ CLI mode not available in this build")
+        return 1
+    except Exception as e:
+        print(f"❌ CLI error: {e}")
         return 1
 
 if __name__ == "__main__":
