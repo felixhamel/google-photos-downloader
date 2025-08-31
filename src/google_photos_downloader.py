@@ -711,6 +711,31 @@ class GooglePhotosGUI:
         self.root.geometry("600x500")
         self.root.resizable(True, True)
         
+        # Theme management
+        self.dark_mode = False
+        self.themes = {
+            'light': {
+                'bg': '#ffffff',
+                'fg': '#000000',
+                'select_bg': '#0078d4',
+                'select_fg': '#ffffff',
+                'entry_bg': '#ffffff',
+                'entry_fg': '#000000',
+                'text_bg': '#f8f9fa',
+                'text_fg': '#333333'
+            },
+            'dark': {
+                'bg': '#2d2d2d',
+                'fg': '#ffffff',
+                'select_bg': '#404040',
+                'select_fg': '#ffffff',
+                'entry_bg': '#404040',
+                'entry_fg': '#ffffff',
+                'text_bg': '#1e1e1e',
+                'text_fg': '#e0e0e0'
+            }
+        }
+        
         # Set application icon (if available)
         try:
             self.root.iconbitmap('app_icon.ico')
@@ -723,31 +748,48 @@ class GooglePhotosGUI:
         
         self.setup_ui()
         self.setup_callbacks()
+        self.apply_theme()
         
     def setup_ui(self):
         """Create the user interface elements."""
+        # Store UI elements for theme switching
+        self.ui_elements = {'frames': [], 'labels': [], 'entries': [], 'text_widgets': []}
+        
         # Configure styles
-        style = ttk.Style()
-        style.theme_use('clam')  # Modern theme
+        self.style = ttk.Style()
+        self.style.theme_use('clam')  # Modern theme
         
         # Main container with padding
-        main_frame = ttk.Frame(self.root, padding="25")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame = ttk.Frame(self.root, padding="25")
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.ui_elements['frames'].append(self.main_frame)
         
         # Configure grid weights for responsive design
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        self.main_frame.columnconfigure(1, weight=1)
+        
+        # Header with title and theme toggle
+        header_frame = ttk.Frame(self.main_frame)
+        header_frame.grid(row=0, column=0, columnspan=3, pady=(0, 25))
+        header_frame.columnconfigure(0, weight=1)
+        self.ui_elements['frames'].append(header_frame)
         
         # Application title
-        title_label = ttk.Label(main_frame, text="Google Photos Downloader", 
+        title_label = ttk.Label(header_frame, text="Google Photos Downloader", 
                                font=('Arial', 18, 'bold'))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 25))
+        title_label.grid(row=0, column=0, sticky=tk.W)
+        
+        # Theme toggle button
+        self.theme_button = ttk.Button(header_frame, text="🌙 Dark Mode", 
+                                     command=self.toggle_theme)
+        self.theme_button.grid(row=0, column=1, sticky=tk.E)
         
         # Source selection section
-        source_frame = ttk.LabelFrame(main_frame, text="Download Source", padding="15")
+        source_frame = ttk.LabelFrame(self.main_frame, text="Download Source", padding="15")
         source_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         source_frame.columnconfigure(1, weight=1)
+        self.ui_elements['frames'].append(source_frame)
         
         # Source type selection
         self.source_type_var = tk.StringVar(value="date_range")
@@ -762,9 +804,10 @@ class GooglePhotosGUI:
         album_radio.grid(row=0, column=1, sticky=tk.W, pady=5)
         
         # Date selection section
-        date_frame = ttk.LabelFrame(main_frame, text="Date Range", padding="15")
+        date_frame = ttk.LabelFrame(self.main_frame, text="Date Range", padding="15")
         date_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         date_frame.columnconfigure(1, weight=1)
+        self.ui_elements['frames'].append(date_frame)
         
         # Start date
         ttk.Label(date_frame, text="From:").grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -878,6 +921,7 @@ class GooglePhotosGUI:
         self.status_text = tk.Text(text_frame, height=8, wrap=tk.WORD, 
                                   font=('Consolas', 9), bg='#f8f9fa', fg='#333')
         self.status_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.ui_elements['text_widgets'].append(self.status_text)
         
         scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.status_text.yview)
         scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
@@ -900,7 +944,7 @@ class GooglePhotosGUI:
         self.cancel_button.pack(side=tk.LEFT)
         
         # Configure main_frame row weights for proper resizing
-        main_frame.rowconfigure(7, weight=1)
+        self.main_frame.rowconfigure(7, weight=1)
         
         # Initialize UI state
         self.albums = []
@@ -1319,6 +1363,48 @@ class GooglePhotosGUI:
                 self.root.destroy()
         else:
             self.root.destroy()
+    
+    def toggle_theme(self):
+        """Toggle between light and dark themes."""
+        self.dark_mode = not self.dark_mode
+        self.apply_theme()
+        
+        # Update button text
+        if self.dark_mode:
+            self.theme_button.config(text="☀️ Light Mode")
+        else:
+            self.theme_button.config(text="🌙 Dark Mode")
+    
+    def apply_theme(self):
+        """Apply the current theme to all UI elements."""
+        theme = self.themes['dark' if self.dark_mode else 'light']
+        
+        # Configure root window
+        self.root.configure(bg=theme['bg'])
+        
+        # Configure ttk styles for dark/light theme
+        if self.dark_mode:
+            self.style.theme_use('clam')
+            self.style.configure('TFrame', background=theme['bg'])
+            self.style.configure('TLabel', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TLabelFrame', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TLabelFrame.Label', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TButton', background=theme['select_bg'], foreground=theme['fg'])
+            self.style.configure('TRadiobutton', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TCheckbutton', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TCombobox', fieldbackground=theme['entry_bg'], foreground=theme['entry_fg'])
+            self.style.configure('TEntry', fieldbackground=theme['entry_bg'], foreground=theme['entry_fg'])
+        else:
+            self.style.theme_use('clam')
+            # Reset to default light theme styles
+            self.style.configure('TFrame', background=theme['bg'])
+            self.style.configure('TLabel', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TLabelFrame', background=theme['bg'], foreground=theme['fg'])
+            self.style.configure('TLabelFrame.Label', background=theme['bg'], foreground=theme['fg'])
+        
+        # Update Text widgets manually (they don't use ttk styles)
+        for text_widget in self.ui_elements.get('text_widgets', []):
+            text_widget.configure(bg=theme['text_bg'], fg=theme['text_fg'])
     
     def run(self):
         """Start the GUI application."""
