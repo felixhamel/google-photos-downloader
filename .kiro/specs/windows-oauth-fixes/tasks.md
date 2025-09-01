@@ -24,25 +24,25 @@
   - Test that ForwardRef._evaluate() error is resolved
   - _Requirements: 1.1, 1.4_
 
-- [ ] 2. Fix OAuth authentication flow
+- [x] 2. Fix OAuth authentication flow
   - Add comprehensive logging to OAuth authentication process
   - Fix token validation and service initialization logic
   - Ensure proper error handling and user feedback for authentication failures
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 2.1 Add detailed OAuth debugging and logging
+- [x] 2.1 Add detailed OAuth debugging and logging
   - Modify app/core/downloader.py authenticate() method to add step-by-step logging
   - Add validation for credentials.json file format and content
   - Log token creation, validation, and service initialization steps
   - _Requirements: 2.1, 2.3_
 
-- [ ] 2.2 Fix token validation and service initialization
+- [x] 2.2 Fix token validation and service initialization
   - Update authenticate() method to properly validate tokens before marking as successful
   - Ensure Google API service is properly initialized after OAuth completion
   - Add error handling for service creation failures
   - _Requirements: 2.1, 2.2_
 
-- [ ] 2.3 Improve OAuth error messages and user feedback
+- [x] 2.3 Improve OAuth error messages and user feedback
   - Update authentication status responses to provide specific error details
   - Add clear error messages for different failure scenarios (missing credentials, invalid tokens, etc.)
   - Test OAuth flow end-to-end to ensure success/failure states are properly communicated

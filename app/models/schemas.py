@@ -47,9 +47,14 @@ class ApiResponse(BaseModel):
 
 
 class AuthStatus(BaseModel):
-    """Authentication status response."""
+    """Authentication status response with detailed error information."""
     authenticated: bool
     message: str
+    error_type: Optional[str] = None
+    error_details: Optional[str] = None
+    suggestions: Optional[List[str]] = None
+    credentials_file_exists: Optional[bool] = None
+    token_file_exists: Optional[bool] = None
 
 
 class AlbumInfo(BaseModel):

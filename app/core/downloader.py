@@ -8,6 +8,8 @@ import requests
 import hashlib
 import time
 import asyncio
+import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable, Tuple
@@ -115,41 +117,338 @@ class GooglePhotosDownloader:
             eta_str = f" ETA: {eta//60}m {eta%60}s" if eta else ""
             print(f"Progress: {current}/{total} ({percentage:.1f}%) Speed: {speed:.1f} MB/s{eta_str}")
     
-    def authenticate(self) -> bool:
-        """Authenticate with Google Photos API using OAuth2."""
-        if not GOOGLE_APIS_AVAILABLE:
-            self.update_status("Error: Google APIs not available")
-            return False
-            
+    def _validate_credentials_file(self) -> bool:
+        """Validate the credentials.json file format and content."""
         try:
-            # Load existing token if available
-            if os.path.exists(self.token_file):
-                self.creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
+            self.update_status(f"Validating credentials file: {self.credentials_file}")
             
-            # If no valid credentials, get new ones
-            if not self.creds or not self.creds.valid:
-                if self.creds and self.creds.expired and self.creds.refresh_token:
-                    self.update_status("Refreshing authentication token...")
-                    self.creds.refresh(Request())
-                else:
-                    if not os.path.exists(self.credentials_file):
-                        self.update_status(f"Error: '{self.credentials_file}' not found. Please download OAuth2 credentials from Google Cloud Console.")
-                        return False
-                    
-                    self.update_status("Opening browser for Google authentication...")
-                    flow = InstalledAppFlow.from_client_secrets_file(self.credentials_file, SCOPES)
-                    self.creds = flow.run_local_server(port=0)
+            if not os.path.exists(self.credentials_file):
+                self.update_status(f"Error: Credentials file '{self.credentials_file}' not found")
+                return False
+            
+            # Check file size
+            file_size = os.path.getsize(self.credentials_file)
+            self.update_status(f"Credentials file size: {file_size} bytes")
+            
+            if file_size == 0:
+                self.update_status("Error: Credentials file is empty")
+                return False
+            
+            # Validate JSON format and required fields
+            with open(self.credentials_file, 'r') as f:
+                creds_data = json.load(f)
+            
+            self.update_status("Credentials file JSON format is valid")
+            
+            # Check for required OAuth2 fields
+            if 'installed' not in creds_data and 'web' not in creds_data:
+                self.update_status("Error: Credentials file missing 'installed' or 'web' configuration")
+                return False
+            
+            # Get the client config (prefer 'installed' for desktop apps)
+            client_config = creds_data.get('installed') or creds_data.get('web')
+            
+            required_fields = ['client_id', 'client_secret', 'auth_uri', 'token_uri']
+            missing_fields = [field for field in required_fields if field not in client_config]
+            
+            if missing_fields:
+                self.update_status(f"Error: Credentials file missing required fields: {missing_fields}")
+                return False
+            
+            self.update_status("Credentials file validation successful")
+            self.update_status(f"Client ID: {client_config['client_id'][:20]}...")
+            
+            return True
+            
+        except json.JSONDecodeError as e:
+            self.update_status(f"Error: Invalid JSON in credentials file: {e}")
+            return False
+        except Exception as e:
+            self.update_status(f"Error validating credentials file: {e}")
+            return False
+
+    def _validate_token(self, creds: Credentials) -> bool:
+        """Validate token structure and properties with comprehensive checks."""
+        try:
+            self.update_status("Validating OAuth token...")
+            
+            if not creds:
+                self.update_status("Error: No credentials object provided")
+                return False
+            
+            # Check basic token properties
+            is_valid = creds.valid
+            is_expired = creds.expired
+            has_refresh = bool(creds.refresh_token)
+            
+            self.update_status(f"Token valid: {is_valid}")
+            self.update_status(f"Token expired: {is_expired}")
+            self.update_status(f"Has refresh token: {has_refresh}")
+            
+            # Validate access token presence and format
+            if creds.token:
+                self.update_status(f"Access token present: {creds.token[:20]}...")
+                # Basic token format validation (should be a string)
+                if not isinstance(creds.token, str) or len(creds.token) < 10:
+                    self.update_status("Error: Access token appears to be invalid format")
+                    return False
+            else:
+                self.update_status("Error: No access token present")
+                return False
+            
+            # Check token expiry
+            if creds.expiry:
+                self.update_status(f"Token expires at: {creds.expiry}")
+                time_until_expiry = (creds.expiry - datetime.utcnow()).total_seconds()
+                self.update_status(f"Time until expiry: {time_until_expiry:.0f} seconds")
                 
-                # Save credentials for future use
-                with open(self.token_file, 'w') as token:
-                    token.write(self.creds.to_json())
+                # Warn if token expires very soon (less than 5 minutes)
+                if time_until_expiry < 300:
+                    self.update_status("Warning: Token expires very soon, may need refresh")
+            else:
+                self.update_status("Warning: No expiry time set for token")
             
-            self.service = build('photoslibrary', 'v1', credentials=self.creds)
-            self.update_status("Successfully authenticated with Google Photos API")
+            # Validate scopes if available
+            if hasattr(creds, 'scopes') and creds.scopes:
+                self.update_status(f"Token scopes: {creds.scopes}")
+                # Check if required scopes are present
+                required_scope = 'https://www.googleapis.com/auth/photoslibrary.readonly'
+                if required_scope not in creds.scopes:
+                    self.update_status(f"Warning: Required scope '{required_scope}' not found in token")
+            
+            # Final validation - token must be valid for use
+            if not is_valid:
+                if is_expired and has_refresh:
+                    self.update_status("Token is expired but can be refreshed")
+                    return True  # This is recoverable
+                else:
+                    self.update_status("Error: Token is invalid and cannot be refreshed")
+                    return False
+            
+            self.update_status("Token validation successful")
             return True
             
         except Exception as e:
-            self.update_status(f"Authentication failed: {e}")
+            self.update_status(f"Error validating token: {e}")
+            return False
+
+    def _initialize_service(self, creds: Credentials) -> bool:
+        """Initialize Google Photos API service and validate it works with comprehensive error handling."""
+        try:
+            self.update_status("Initializing Google Photos API service...")
+            
+            # Pre-validation checks
+            if not creds:
+                self.update_status("Error: No credentials provided to service initialization")
+                return False
+                
+            if not creds.valid:
+                self.update_status("Error: Invalid credentials provided to service initialization")
+                self.update_status(f"Credential status - Valid: {creds.valid}, Expired: {creds.expired}")
+                return False
+            
+            # Clear any existing service
+            self.service = None
+            
+            # Build the service with error handling
+            try:
+                self.update_status("Building Google Photos API service object...")
+                self.service = build('photoslibrary', 'v1', credentials=creds, cache_discovery=False)
+                self.update_status("Google Photos API service object created successfully")
+            except Exception as e:
+                self.update_status(f"Error building API service: {e}")
+                return False
+            
+            # Validate service object
+            if not self.service:
+                self.update_status("Error: Service object is None after creation")
+                return False
+            
+            # Test the service with multiple validation calls
+            self.update_status("Testing API service functionality...")
+            
+            try:
+                # Test 1: Try to get albums (lightweight call)
+                self.update_status("Test 1: Fetching albums list...")
+                test_response = self.service.albums().list(pageSize=1).execute()
+                
+                if 'albums' in test_response:
+                    album_count = len(test_response['albums'])
+                    self.update_status(f"Albums test successful - found {album_count} albums")
+                else:
+                    self.update_status("Albums test successful - no albums found (normal)")
+                
+                # Test 2: Try to search for media items (another lightweight call)
+                self.update_status("Test 2: Testing media search capability...")
+                search_body = {
+                    'pageSize': 1,
+                    'filters': {
+                        'mediaTypeFilter': {
+                            'mediaTypes': ['PHOTO']
+                        }
+                    }
+                }
+                
+                media_response = self.service.mediaItems().search(body=search_body).execute()
+                
+                if 'mediaItems' in media_response:
+                    media_count = len(media_response['mediaItems'])
+                    self.update_status(f"Media search test successful - found {media_count} items")
+                else:
+                    self.update_status("Media search test successful - no media found")
+                
+                self.update_status("All API service tests passed successfully")
+                return True
+                
+            except HttpError as e:
+                error_details = str(e)
+                status_code = getattr(e, 'resp', {}).get('status', 'unknown')
+                
+                self.update_status(f"API service test failed with HTTP {status_code} error: {error_details}")
+                
+                # Provide specific error guidance
+                if '401' in str(status_code):
+                    self.update_status("Error 401: Authentication failed - token may be invalid or expired")
+                elif '403' in str(status_code):
+                    self.update_status("Error 403: Access forbidden - check API permissions and scopes")
+                elif '404' in str(status_code):
+                    self.update_status("Error 404: API endpoint not found - check API version")
+                elif '429' in str(status_code):
+                    self.update_status("Error 429: Rate limit exceeded - too many requests")
+                else:
+                    self.update_status(f"HTTP Error {status_code}: {error_details}")
+                
+                return False
+                
+            except Exception as e:
+                self.update_status(f"API service test failed with unexpected error: {e}")
+                import traceback
+                self.update_status(f"Service test error traceback: {traceback.format_exc()}")
+                return False
+                
+        except Exception as e:
+            self.update_status(f"Critical error during service initialization: {e}")
+            import traceback
+            self.update_status(f"Service initialization error traceback: {traceback.format_exc()}")
+            return False
+
+    def authenticate(self) -> bool:
+        """Authenticate with Google Photos API using OAuth2 with comprehensive logging."""
+        self.update_status("=== Starting OAuth Authentication Process ===")
+        
+        if not GOOGLE_APIS_AVAILABLE:
+            self.update_status("Error: Google APIs not available - required packages not installed")
+            self.update_status("Please install: pip install google-auth google-auth-oauthlib google-api-python-client")
+            return False
+        
+        self.update_status("Google API packages are available")
+        
+        try:
+            # Step 1: Validate credentials file
+            self.update_status("Step 1: Validating credentials file...")
+            if not self._validate_credentials_file():
+                return False
+            
+            # Step 2: Load existing token if available
+            self.update_status("Step 2: Checking for existing token...")
+            if os.path.exists(self.token_file):
+                self.update_status(f"Found existing token file: {self.token_file}")
+                try:
+                    self.creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
+                    self.update_status("Successfully loaded existing token")
+                    self._validate_token(self.creds)
+                except Exception as e:
+                    self.update_status(f"Error loading existing token: {e}")
+                    self.creds = None
+            else:
+                self.update_status(f"No existing token file found at: {self.token_file}")
+                self.creds = None
+            
+            # Step 3: Check if credentials are valid or need refresh/reauth
+            self.update_status("Step 3: Checking credential validity...")
+            if not self.creds or not self.creds.valid:
+                if self.creds and self.creds.expired and self.creds.refresh_token:
+                    self.update_status("Token expired but refresh token available - attempting refresh...")
+                    try:
+                        self.creds.refresh(Request())
+                        self.update_status("Token refresh successful")
+                        
+                        # Validate the refreshed token
+                        if not self._validate_token(self.creds):
+                            self.update_status("Error: Refreshed token validation failed")
+                            self.creds = None
+                        elif not self.creds.valid:
+                            self.update_status("Error: Token still invalid after refresh")
+                            self.creds = None
+                            
+                    except Exception as e:
+                        self.update_status(f"Token refresh failed: {e}")
+                        self.update_status("Will need to perform full OAuth flow")
+                        self.creds = None
+                else:
+                    if self.creds:
+                        self.update_status("Token invalid and no refresh token available")
+                    else:
+                        self.update_status("No valid credentials available")
+                    
+                    self.update_status("Starting OAuth authorization flow...")
+                    try:
+                        flow = InstalledAppFlow.from_client_secrets_file(self.credentials_file, SCOPES)
+                        self.update_status("OAuth flow created successfully")
+                        self.update_status("Opening browser for Google authentication...")
+                        self.creds = flow.run_local_server(port=0)
+                        self.update_status("OAuth flow completed successfully")
+                        
+                        # Validate the new token
+                        if not self._validate_token(self.creds):
+                            self.update_status("Error: New token validation failed")
+                            return False
+                        elif not self.creds.valid:
+                            self.update_status("Error: New token is not valid")
+                            return False
+                            
+                    except Exception as e:
+                        self.update_status(f"OAuth flow failed: {e}")
+                        return False
+                
+                # Step 4: Save new/refreshed credentials
+                self.update_status("Step 4: Saving credentials...")
+                try:
+                    with open(self.token_file, 'w') as token:
+                        token.write(self.creds.to_json())
+                    self.update_status(f"Credentials saved to: {self.token_file}")
+                except Exception as e:
+                    self.update_status(f"Warning: Failed to save credentials: {e}")
+            else:
+                self.update_status("Existing credentials are valid")
+            
+            # Step 5: Initialize and test API service
+            self.update_status("Step 5: Initializing API service...")
+            if not self._initialize_service(self.creds):
+                return False
+            
+            self.update_status("=== OAuth Authentication Successful ===")
+            return True
+            
+        except Exception as e:
+            self.update_status("=== OAuth Authentication Failed ===")
+            self.update_status(f"Unexpected error during authentication: {e}")
+            
+            # Provide user-friendly error guidance
+            error_str = str(e).lower()
+            if 'permission' in error_str or 'access' in error_str:
+                self.update_status("This appears to be a permissions issue. Check file permissions and try running as administrator if needed.")
+            elif 'network' in error_str or 'connection' in error_str:
+                self.update_status("This appears to be a network issue. Check your internet connection and firewall settings.")
+            elif 'json' in error_str or 'decode' in error_str:
+                self.update_status("This appears to be a file format issue. Check that your credentials.json file is valid.")
+            elif 'import' in error_str or 'module' in error_str:
+                self.update_status("This appears to be a missing dependency issue. Ensure all required packages are installed.")
+            else:
+                self.update_status("For detailed troubleshooting, check the application logs or contact support.")
+            
+            import traceback
+            self.update_status(f"Full error traceback: {traceback.format_exc()}")
             return False
     
     def date_to_google_format(self, date_obj: datetime) -> Dict[str, Any]:
@@ -392,6 +691,225 @@ class GooglePhotosDownloader:
             self.update_status(f"Unexpected error downloading {item.get('filename', 'unknown')}: {e}")
             return False, 0
     
+    def get_detailed_auth_status(self) -> Dict[str, Any]:
+        """Get detailed authentication status with error information and suggestions."""
+        status = {
+            'authenticated': False,
+            'message': '',
+            'error_type': None,
+            'error_details': None,
+            'suggestions': [],
+            'credentials_file_exists': os.path.exists(self.credentials_file),
+            'token_file_exists': os.path.exists(self.token_file)
+        }
+        
+        try:
+            # Check if Google APIs are available
+            if not GOOGLE_APIS_AVAILABLE:
+                status.update({
+                    'message': 'Google API packages not installed',
+                    'error_type': 'missing_dependencies',
+                    'error_details': 'Required Google API packages are not installed',
+                    'suggestions': [
+                        'Install required packages: pip install google-auth google-auth-oauthlib google-api-python-client',
+                        'Check your Python environment and package installation'
+                    ]
+                })
+                return status
+            
+            # Check credentials file
+            if not status['credentials_file_exists']:
+                status.update({
+                    'message': 'Credentials file not found',
+                    'error_type': 'missing_credentials',
+                    'error_details': f'The credentials file "{self.credentials_file}" does not exist',
+                    'suggestions': [
+                        'Download OAuth2 credentials from Google Cloud Console',
+                        'Save the credentials as "credentials.json" in the application directory',
+                        'Ensure the file contains valid OAuth2 client configuration'
+                    ]
+                })
+                return status
+            
+            # Validate credentials file format
+            try:
+                with open(self.credentials_file, 'r') as f:
+                    creds_data = json.load(f)
+                
+                if 'installed' not in creds_data and 'web' not in creds_data:
+                    status.update({
+                        'message': 'Invalid credentials file format',
+                        'error_type': 'invalid_credentials_format',
+                        'error_details': 'Credentials file missing required OAuth2 configuration',
+                        'suggestions': [
+                            'Re-download credentials from Google Cloud Console',
+                            'Ensure you download "Desktop Application" credentials',
+                            'Verify the JSON file contains "installed" or "web" configuration'
+                        ]
+                    })
+                    return status
+                    
+            except json.JSONDecodeError:
+                status.update({
+                    'message': 'Credentials file contains invalid JSON',
+                    'error_type': 'invalid_json',
+                    'error_details': 'The credentials file is not valid JSON format',
+                    'suggestions': [
+                        'Re-download credentials from Google Cloud Console',
+                        'Check the file for syntax errors or corruption',
+                        'Ensure the file was downloaded completely'
+                    ]
+                })
+                return status
+            except Exception as e:
+                status.update({
+                    'message': 'Error reading credentials file',
+                    'error_type': 'file_read_error',
+                    'error_details': str(e),
+                    'suggestions': [
+                        'Check file permissions',
+                        'Ensure the file is not corrupted',
+                        'Try re-downloading the credentials file'
+                    ]
+                })
+                return status
+            
+            # Check existing token
+            if status['token_file_exists']:
+                try:
+                    creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
+                    
+                    if creds and creds.valid:
+                        # Test the service
+                        try:
+                            service = build('photoslibrary', 'v1', credentials=creds, cache_discovery=False)
+                            test_response = service.albums().list(pageSize=1).execute()
+                            
+                            status.update({
+                                'authenticated': True,
+                                'message': 'Successfully authenticated with Google Photos API',
+                                'suggestions': ['Authentication is working correctly']
+                            })
+                            return status
+                            
+                        except HttpError as e:
+                            error_code = getattr(e, 'resp', {}).get('status', 'unknown')
+                            if '401' in str(error_code):
+                                status.update({
+                                    'message': 'Token authentication failed',
+                                    'error_type': 'token_invalid',
+                                    'error_details': 'Access token is invalid or expired',
+                                    'suggestions': [
+                                        'Delete the token.json file to force re-authentication',
+                                        'Run the authentication process again',
+                                        'Check if your Google Cloud project is still active'
+                                    ]
+                                })
+                            elif '403' in str(error_code):
+                                status.update({
+                                    'message': 'API access forbidden',
+                                    'error_type': 'api_forbidden',
+                                    'error_details': 'Access to Google Photos API is forbidden',
+                                    'suggestions': [
+                                        'Check if Google Photos API is enabled in your Google Cloud project',
+                                        'Verify your OAuth2 scopes include Photos Library access',
+                                        'Ensure your Google Cloud project has proper permissions'
+                                    ]
+                                })
+                            else:
+                                status.update({
+                                    'message': f'API error: {error_code}',
+                                    'error_type': 'api_error',
+                                    'error_details': str(e),
+                                    'suggestions': [
+                                        'Check your internet connection',
+                                        'Verify Google Photos API is accessible',
+                                        'Try again in a few minutes'
+                                    ]
+                                })
+                            return status
+                            
+                    elif creds and creds.expired:
+                        if creds.refresh_token:
+                            status.update({
+                                'message': 'Token expired but can be refreshed',
+                                'error_type': 'token_expired',
+                                'error_details': 'Access token has expired but refresh token is available',
+                                'suggestions': [
+                                    'Run the authentication process to refresh the token',
+                                    'The system will automatically refresh the token on next authentication'
+                                ]
+                            })
+                        else:
+                            status.update({
+                                'message': 'Token expired and cannot be refreshed',
+                                'error_type': 'token_expired_no_refresh',
+                                'error_details': 'Access token has expired and no refresh token is available',
+                                'suggestions': [
+                                    'Delete the token.json file',
+                                    'Run the authentication process again to get new tokens'
+                                ]
+                            })
+                        return status
+                    else:
+                        status.update({
+                            'message': 'Token is invalid',
+                            'error_type': 'token_invalid',
+                            'error_details': 'The stored token is not valid',
+                            'suggestions': [
+                                'Delete the token.json file',
+                                'Run the authentication process again'
+                            ]
+                        })
+                        return status
+                        
+                except Exception as e:
+                    status.update({
+                        'message': 'Error loading existing token',
+                        'error_type': 'token_load_error',
+                        'error_details': str(e),
+                        'suggestions': [
+                            'Delete the token.json file',
+                            'Run the authentication process again',
+                            'Check file permissions'
+                        ]
+                    })
+                    return status
+            else:
+                # No token file exists
+                status.update({
+                    'message': 'Authentication required',
+                    'error_type': 'no_token',
+                    'error_details': 'No authentication token found',
+                    'suggestions': [
+                        'Run the authentication process to authorize the application',
+                        'This will open a browser window for Google OAuth authorization',
+                        'Make sure you have a valid credentials.json file'
+                    ]
+                })
+                return status
+                
+        except Exception as e:
+            status.update({
+                'message': 'Unexpected error checking authentication status',
+                'error_type': 'unexpected_error',
+                'error_details': str(e),
+                'suggestions': [
+                    'Check application logs for more details',
+                    'Ensure all required files are present',
+                    'Try restarting the application'
+                ]
+            })
+            return status
+        
+        # Fallback
+        status.update({
+            'message': 'Authentication status unknown',
+            'error_type': 'unknown',
+            'suggestions': ['Try running the authentication process']
+        })
+        return status
+
     def cancel_download(self):
         """Cancel the current download operation."""
         self.cancelled = True

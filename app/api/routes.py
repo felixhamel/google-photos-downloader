@@ -40,48 +40,89 @@ downloader = None
 
 @router.get("/auth/status", response_model=AuthStatus)
 async def get_auth_status():
-    """Check authentication status."""
+    """Check authentication status with detailed error information."""
     global downloader
     
     try:
         if not downloader:
             downloader = GooglePhotosDownloader(config=config)
         
-        if downloader.authenticate():
-            return AuthStatus(
-                authenticated=True,
-                message="Successfully authenticated with Google Photos API"
-            )
-        else:
-            return AuthStatus(
-                authenticated=False,
-                message="Authentication required. Please check credentials.json file."
-            )
+        # Get detailed status without triggering full authentication
+        status_info = downloader.get_detailed_auth_status()
+        
+        return AuthStatus(**status_info)
+        
     except Exception as e:
         return AuthStatus(
             authenticated=False,
-            message=f"Authentication error: {str(e)}"
+            message="Error checking authentication status",
+            error_type="status_check_error",
+            error_details=str(e),
+            suggestions=[
+                "Check application logs for more details",
+                "Ensure all required files are present",
+                "Try restarting the application"
+            ]
         )
 
 
 @router.post("/auth/authenticate")
 async def authenticate():
-    """Trigger authentication process."""
+    """Trigger authentication process with detailed error handling."""
     global downloader
     
     try:
         if not downloader:
             downloader = GooglePhotosDownloader(config=config)
         
+        # Capture status messages during authentication
+        auth_messages = []
+        
+        def capture_status(message: str):
+            auth_messages.append(message)
+        
+        downloader.set_callbacks(status_callback=capture_status)
+        
         if downloader.authenticate():
             return ApiResponse(
                 success=True,
-                message="Authentication successful"
+                message="Authentication successful - Google Photos API access granted"
             )
         else:
-            raise HTTPException(status_code=401, detail="Authentication failed")
+            # Get detailed error information
+            status_info = downloader.get_detailed_auth_status()
+            
+            error_detail = {
+                "error_type": status_info.get('error_type', 'authentication_failed'),
+                "error_details": status_info.get('error_details', 'Authentication process failed'),
+                "suggestions": status_info.get('suggestions', []),
+                "auth_messages": auth_messages[-10:]  # Last 10 messages
+            }
+            
+            raise HTTPException(
+                status_code=401, 
+                detail=f"Authentication failed: {status_info.get('message', 'Unknown error')}"
+            )
+            
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Get detailed error information for unexpected errors
+        try:
+            status_info = downloader.get_detailed_auth_status() if downloader else {}
+            error_detail = {
+                "error_type": "unexpected_error",
+                "error_details": str(e),
+                "suggestions": status_info.get('suggestions', [
+                    "Check application logs for more details",
+                    "Ensure all required files are present",
+                    "Try restarting the application"
+                ])
+            }
+        except:
+            error_detail = {"error_type": "critical_error", "error_details": str(e)}
+        
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
 
 
 @router.get("/albums", response_model=List[AlbumInfo])
