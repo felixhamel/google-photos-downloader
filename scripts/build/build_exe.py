@@ -15,9 +15,10 @@ def main():
     print("🔧 Building Google Photos Downloader executable...")
     print("=" * 60)
     
-    # Change to script directory
-    script_dir = Path(__file__).parent.absolute()
-    os.chdir(script_dir)
+    # Change to project root directory (2 levels up from scripts/build/)
+    project_root = Path(__file__).parent.parent.parent.absolute()
+    os.chdir(project_root)
+    print(f"   Working directory: {project_root}")
     
     # Clean previous builds
     print("🧹 Cleaning previous builds...")
@@ -160,10 +161,13 @@ exe = EXE(
         if not exe_path.suffix == '.exe':
             os.chmod(target_exe, 0o755)
         
-        # Copy documentation
+        # Copy documentation from project root
+        project_root = Path.cwd()
         for doc in ['README.md', 'OAUTH_GUIDE.md', 'INSTALL_WINDOWS.md']:
-            if Path(doc).exists():
-                shutil.copy2(doc, dist_folder)
+            doc_path = project_root / doc
+            if doc_path.exists():
+                shutil.copy2(doc_path, dist_folder)
+                print(f"   Copied {doc}")
         
         # Create setup instructions
         setup_instructions = '''# Google Photos Downloader - Portable Version
