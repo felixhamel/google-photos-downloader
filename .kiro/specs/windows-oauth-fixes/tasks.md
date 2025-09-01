@@ -48,25 +48,25 @@
   - Test OAuth flow end-to-end to ensure success/failure states are properly communicated
   - _Requirements: 2.3_
 
-- [-] 3. Fix Windows compatibility issues
+- [x] 3. Fix Windows compatibility issues
   - Update file path handling to use pathlib consistently for Windows compatibility
   - Fix static file mounting and configuration file access on Windows
   - Ensure server startup works properly on Windows systems
   - _Requirements: 1.2, 1.3, 1.5_
 
-- [-] 3.1 Fix file path handling for Windows compatibility
+- [x] 3.1 Fix file path handling for Windows compatibility
   - Update app/core/config.py to use pathlib.Path for all file operations
   - Fix static file mounting in app/main.py to use proper cross-platform paths
   - Ensure all file access uses Windows-compatible path separators
   - _Requirements: 1.2, 1.3_
 
-- [ ] 3.2 Fix server startup and configuration loading on Windows
+- [x] 3.2 Fix server startup and configuration loading on Windows
   - Update app/main.py to handle Windows-specific startup issues
   - Ensure configuration files are loaded correctly on Windows
   - Test that `python app/main.py` works without errors on Windows
   - _Requirements: 1.1, 1.2_
 
-- [ ] 4. Clean up GitHub workflows
+- [-] 4. Clean up GitHub workflows
   - Remove complex PyInstaller build configurations from GitHub workflows
   - Simplify workflows to basic Python testing only
   - Remove executable packaging and artifact generation

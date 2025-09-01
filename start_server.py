@@ -22,8 +22,9 @@ def main():
     script_dir = Path(__file__).parent.absolute()
     os.chdir(script_dir)
     
-    # Check for credentials.json
-    if not os.path.exists("credentials.json"):
+    # Check for credentials.json using pathlib
+    credentials_file = Path("credentials.json")
+    if not credentials_file.exists():
         print("❌ ERROR: credentials.json not found!")
         print("📋 Please download OAuth2 credentials from Google Cloud Console")
         print("📖 See OAUTH_GUIDE.md for detailed instructions")
@@ -79,18 +80,21 @@ def main():
 def install_and_restart():
     """Install dependencies and restart."""
     try:
-        # Try Windows-specific requirements first
-        if os.path.exists("requirements-web-windows.txt"):
+        # Try Windows-specific requirements first using pathlib
+        windows_req = Path("requirements-web-windows.txt")
+        web_req = Path("requirements-web.txt")
+        
+        if windows_req.exists():
             print("📦 Installing Windows-compatible packages...")
             subprocess.run([
                 sys.executable, "-m", "pip", "install", 
-                "--only-binary=all", "-r", "requirements-web-windows.txt"
+                "--only-binary=all", "-r", str(windows_req)
             ], check=True)
-        elif os.path.exists("requirements-web.txt"):
+        elif web_req.exists():
             print("📦 Installing from requirements-web.txt...")
             subprocess.run([
                 sys.executable, "-m", "pip", "install",
-                "--only-binary=all", "-r", "requirements-web.txt"
+                "--only-binary=all", "-r", str(web_req)
             ], check=True)
         else:
             print("📦 Installing individual packages...")

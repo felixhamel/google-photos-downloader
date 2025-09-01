@@ -3,7 +3,6 @@ Core Google Photos downloader logic
 """
 from __future__ import annotations
 
-import os
 import requests
 import hashlib
 import time
@@ -122,12 +121,13 @@ class GooglePhotosDownloader:
         try:
             self.update_status(f"Validating credentials file: {self.credentials_file}")
             
-            if not os.path.exists(self.credentials_file):
+            credentials_path = Path(self.credentials_file)
+            if not credentials_path.exists():
                 self.update_status(f"Error: Credentials file '{self.credentials_file}' not found")
                 return False
             
             # Check file size
-            file_size = os.path.getsize(self.credentials_file)
+            file_size = credentials_path.stat().st_size
             self.update_status(f"Credentials file size: {file_size} bytes")
             
             if file_size == 0:
@@ -351,7 +351,8 @@ class GooglePhotosDownloader:
             
             # Step 2: Load existing token if available
             self.update_status("Step 2: Checking for existing token...")
-            if os.path.exists(self.token_file):
+            token_path = Path(self.token_file)
+            if token_path.exists():
                 self.update_status(f"Found existing token file: {self.token_file}")
                 try:
                     self.creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
@@ -622,7 +623,10 @@ class GooglePhotosDownloader:
             timestamp = datetime.fromisoformat(creation_time.replace('Z', '+00:00'))
             safe_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
             
-            name, ext = os.path.splitext(filename)
+            # Use pathlib for file extension handling
+            file_path_obj = Path(filename)
+            name = file_path_obj.stem
+            ext = file_path_obj.suffix
             safe_filename = f"{safe_timestamp}_{name}{ext}"
             file_path = output_dir / safe_filename
             
@@ -699,8 +703,8 @@ class GooglePhotosDownloader:
             'error_type': None,
             'error_details': None,
             'suggestions': [],
-            'credentials_file_exists': os.path.exists(self.credentials_file),
-            'token_file_exists': os.path.exists(self.token_file)
+            'credentials_file_exists': Path(self.credentials_file).exists(),
+            'token_file_exists': Path(self.token_file).exists()
         }
         
         try:

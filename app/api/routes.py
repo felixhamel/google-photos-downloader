@@ -466,13 +466,15 @@ def _download_item_sync_fixed(downloader: GooglePhotosDownloader, item: dict, ou
         
         # Create safe filename with timestamp
         from datetime import datetime
-        import os
         
         creation_time = media_metadata['creationTime']
         timestamp = datetime.fromisoformat(creation_time.replace('Z', '+00:00'))
         safe_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
         
-        name, ext = os.path.splitext(filename)
+        # Use pathlib for file extension handling
+        file_path_obj = Path(filename)
+        name = file_path_obj.stem
+        ext = file_path_obj.suffix
         safe_filename = f"{safe_timestamp}_{name}{ext}"
         file_path = output_path / safe_filename
         
