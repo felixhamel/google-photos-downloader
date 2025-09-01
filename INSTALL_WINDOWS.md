@@ -1,129 +1,93 @@
 # Windows Installation Guide
 
-## Fixing "Rust/Cargo compilation required" errors
+## Option 1: Use the Executable (Recommended)
 
-If you see errors about **Rust**, **Cargo**, or **compilation required**, it's because some newer Python packages need to be compiled from source. Here's how to fix it:
+**No Python installation needed!**
 
-## Quick fix (recommended)
+1. Download [GooglePhotosDownloader-Windows.zip](https://github.com/felixhamel/google-photos-downloader/releases/latest/download/GooglePhotosDownloader-Windows.zip)
+2. Extract the ZIP file to any folder you want
+3. Follow the `OAUTH_GUIDE.md` inside to get Google credentials
+4. Put your `credentials.json` file in the same folder as `GooglePhotosDownloader.exe`
+5. Double-click `GooglePhotosDownloader.exe` to start
 
-Just double-click on `run_web_windows_fixed.bat` - it handles everything automatically.
+The app will automatically open in your web browser at http://127.0.0.1:8000
 
-Or run these commands:
+### Troubleshooting the Executable
 
+**Windows blocks the executable:**
+- Right-click the file → Properties → Check "Unblock" → OK
+- Or add an exception in Windows Defender
+
+**Executable won't start:**
+- Make sure you extracted ALL files from the ZIP
+- Don't run it directly from inside the ZIP file
+- Try running as administrator once
+
+## Option 2: Running from Source
+
+If you want to run from Python source (for development):
+
+### Prerequisites
+- Python 3.8 or newer installed
+- Make sure "Add Python to PATH" was checked during installation
+
+### Installation
 ```cmd
-# Use pre-compiled packages only
+# Download the source code
+git clone https://github.com/felixhamel/google-photos-downloader.git
+cd google-photos-downloader
+
+# Install dependencies (Windows-safe versions)
 pip install --only-binary=all -r requirements-web-windows.txt
 
 # Start the app
 python start_server.py
 ```
 
-## Manual installation
+### If You Get "Rust/Cargo compilation required" Errors
 
-If the automatic script doesn't work:
+This happens with newer Python packages. The `requirements-web-windows.txt` file uses older versions that don't need compilation, but if you still get errors:
 
 ```cmd
-pip install --only-binary=all fastapi==0.100.1
-pip install --only-binary=all uvicorn==0.23.2  
-pip install --only-binary=all pydantic==1.10.13
-pip install --only-binary=all python-multipart==0.0.6
-pip install --only-binary=all websockets==11.0.3
-pip install --only-binary=all google-auth-oauthlib==0.7.1
-pip install --only-binary=all requests==2.31.0
+# Force older versions that don't need Rust
+pip install --force-reinstall --only-binary=all fastapi==0.100.1 uvicorn==0.23.2 pydantic==1.10.13
 ```
 
-The `--only-binary=all` flag tells pip to only use pre-compiled packages, avoiding any compilation that would need Rust or other build tools.
+### Command Line Usage
 
-## 🚀 Modes d'Utilisation
-
-### 1. Mode Web (Interface Graphique)
 ```cmd
-# Lancement web avec interface browser
-run_web_windows_fixed.bat
-# OU
-python start_server.py
-```
-- Interface web moderne à http://127.0.0.1:8000
-- Traduction française complète
-- Suivi temps réel des téléchargements
-- Gestion des sessions
-
-### 2. Mode CLI (Ligne de Commande)
-```cmd
-# Mode commande complète
+# See all options
 python cli_mode.py --help
 
-# Exemples:
+# Download recent photos
+python cli_mode.py --last-30-days
+
+# Download specific date range
+python cli_mode.py --start-date 2023-06-01 --end-date 2023-08-31 --output "Summer_2023"
+
+# List your albums first
 python cli_mode.py --list-albums
-python cli_mode.py --start-date 2023-01-01 --end-date 2023-12-31 --output downloads/2023
-python cli_mode.py --last-30-days --output downloads/recent
-python cli_mode.py --album-id ABC123XYZ --output downloads/album
 ```
 
-### 3. Mode GUI (Original)
-```cmd
-# Interface graphique originale (si réparée)
-python src/google_photos_downloader.py
-```
+## Google Credentials Setup
 
-## 🛠️ En Cas de Problème
+Both methods (executable and source) need Google credentials:
 
-### Python pas trouvé:
-```cmd
-# Installe Python depuis python.org
-# Coche "Add to PATH" pendant l'installation
-```
+1. Go to https://console.cloud.google.com/
+2. Create a new project
+3. Enable "Google Photos Library API"
+4. Create OAuth2 credentials (Desktop Application type)
+5. Download the JSON file and rename it to `credentials.json`
+6. Put it in the same folder as the executable (or project root)
 
-### Erreur PowerShell "Execution Policy":
-```powershell
-# Lance en tant qu'administrateur:
-powershell -ExecutionPolicy Bypass -File run_web_macos.sh
-```
+See `OAUTH_GUIDE.md` for detailed step-by-step instructions.
 
-### Rust/Cargo encore demandé:
-```cmd
-# Force l'installation de versions plus anciennes:
-pip install --force-reinstall --only-binary=all fastapi==0.100.1 uvicorn==0.23.2
-```
+## What You'll Get
 
-## 📋 Versions Testées Windows
+- French web interface at http://127.0.0.1:8000
+- Real-time download progress
+- Photos named with timestamps like `20230615_143022_IMG_1234.jpg`
+- Can resume interrupted downloads
+- Command line mode for automation
 
-- **Windows 10/11** ✅
-- **Python 3.8+** ✅  
-- **Pas besoin de Visual Studio** ✅
-- **Pas besoin de Rust** ✅
-- **Pas besoin de compilateur** ✅
-
-## 🎯 Que Faire Maintenant
-
-1. Supprime les anciens packages qui causent problème:
-   ```cmd
-   pip uninstall fastapi uvicorn pydantic
-   ```
-
-2. Lance le script Windows:
-   ```cmd
-   run_web_windows_fixed.bat
-   ```
-
-3. L'app s'ouvre automatiquement dans Chrome!
-
-**C'est tout!** Plus besoin de Rust/Cargo/compilation. 🎉
-
-## 📁 Structure du Projet
-
-```
-google-photos-downloader/
-├── credentials.json              # ⚠️  REQUIS - À ajouter
-├── run_web_windows_fixed.bat     # Windows launcher
-├── run_web_macos.sh             # macOS/Linux launcher  
-├── start_server.py              # Cross-platform launcher
-├── cli_mode.py                  # Mode CLI complet
-├── run_cli.py                   # Wrapper CLI simple
-├── src/google_photos_downloader.py # GUI original
-├── app/                         # Web application
-├── static/                      # Interface web
-├── requirements-web-windows.txt # Windows dependencies
-├── OAUTH_GUIDE.md              # Setup OAuth2
-└── DEPLOYMENT_GUIDE.md         # Guide complet
-```
+**Recommendation:** Use the executable version unless you're a developer. It's much easier and doesn't require Python setup.

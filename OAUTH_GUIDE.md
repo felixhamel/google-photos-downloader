@@ -1,48 +1,58 @@
 # Setting up Google API access
 
-You need to get credentials from Google before you can download your photos.
+You need to get credentials from Google before you can download your photos. This is a one-time setup.
 
-## What files you'll see
+## Step-by-step instructions
 
-**credentials.json** - This identifies the app to Google. I've already set this up, you just need to download it from Google Cloud Console.
+### 1. Go to Google Cloud Console
+Open https://console.cloud.google.com/ and log in with your Google account.
 
-**token.json** - This gets created automatically the first time you run the app and log in. It's tied to your Google account, so keep it private.
+### 2. Create a project
+- Click the project dropdown at the top
+- Click "New Project" 
+- Give it any name you want (like "Photos Downloader")
+- Click "Create"
 
-## Getting your credentials
+### 3. Enable the Google Photos API
+- Make sure your new project is selected
+- Search for "Photos Library API" in the search bar
+- Click on it and press "Enable"
 
-1. Go to https://console.cloud.google.com/
-2. Create a new project (or use an existing one)
-3. Enable the "Google Photos Library API" 
-4. Go to "Credentials" and create new OAuth 2.0 Client IDs
-5. Choose "Desktop application" as the type
-6. Download the JSON file and rename it to `credentials.json`
-7. Put it in the same folder as the app
+### 4. Create credentials
+- Go to "APIs & Services" > "Credentials" (left sidebar)
+- Click "Create Credentials" > "OAuth 2.0 Client IDs"
+- If it asks, set up the OAuth consent screen first:
+  - Choose "External" user type
+  - Fill in just the required fields (app name, your email)
+  - Skip everything else, just save
+- Now create the OAuth client:
+  - Choose "Desktop application" as the type
+  - Give it any name you want
+  - Click "Create"
+
+### 5. Download the file
+- Click the download button next to your new credential
+- Save the JSON file and rename it to `credentials.json`
+- Put it in the same folder as the executable (or project root if running from source)
 
 ## How it works
 
-First time you run the app:
-- It opens your web browser to Google's login page
-- You sign in with your Google account
-- Google asks if you want to allow the app to access your photos
-- If you click "Allow", Google creates the token.json file
-- The app can now download your photos
+**First time:**
+When you run the app, it opens your browser to Google's login page. You sign in and click "Allow" to let the app access your photos. Google creates a `token.json` file that lets the app access your photos.
 
-Later runs:
-- The app uses the saved token.json
-- If it expires, Google automatically refreshes it
-- If something goes wrong, you just need to delete token.json and log in again
+**Later:**
+The app uses the saved `token.json`. If it expires, Google automatically refreshes it. If something breaks, just delete `token.json` and log in again.
 
-## Multiple users on same computer
+## Multiple users
 
-If different people want to use the app on the same computer, you can:
-- Rename token.json to something like token_mom.json before the second person runs it
-- Or just delete token.json between users
-- Each person will go through the Google login flow for their own account
+If different people want to use the app on the same computer:
+- Each person needs to delete `token.json` before their first use
+- Or rename it to something like `token_mom.json` to keep it
+- Each person goes through the Google login for their own account
 
-## Security notes
+## Security
 
-The app only asks for read-only access to your Google Photos. It can't delete or modify anything.
-
-If you want to revoke access later, go to your Google Account settings > Security > Third-party apps and remove this app.
-
-The credentials.json file is safe to share (it just identifies the app), but never share your token.json file - that's tied to your personal Google account.
+- The app only asks for **read-only** access - it can't delete or modify your photos
+- `credentials.json` is safe to share (just identifies the app)
+- `token.json` is private to your Google account - don't share it
+- You can revoke access anytime in your Google Account settings > Security > Third-party apps
