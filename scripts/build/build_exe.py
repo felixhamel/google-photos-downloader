@@ -12,20 +12,20 @@ from pathlib import Path
 
 def main():
     """Build executable using PyInstaller."""
-    print("🔧 Building Google Photos Downloader executable...")
+    print("Building Google Photos Downloader executable...")
     print("=" * 60)
     
     # Change to project root directory (2 levels up from scripts/build/)
     project_root = Path(__file__).parent.parent.parent.absolute()
     os.chdir(project_root)
-    print(f"   Working directory: {project_root}")
+    print(f"Working directory: {project_root}")
     
     # Clean previous builds
-    print("🧹 Cleaning previous builds...")
+    print("Cleaning previous builds...")
     for dir_name in ['build', 'dist', '__pycache__']:
         if os.path.exists(dir_name):
             shutil.rmtree(dir_name)
-            print(f"   Removed {dir_name}/")
+            print(f"Removed {dir_name}/")
     
     # Create spec file content
     spec_content = '''# -*- mode: python ; coding: utf-8 -*-
@@ -107,13 +107,13 @@ exe = EXE(
 '''
     
     # Write spec file
-    print("📝 Creating PyInstaller spec file...")
+    print("Creating PyInstaller spec file...")
     with open('google_photos_downloader.spec', 'w') as f:
         f.write(spec_content)
-    print("   Created google_photos_downloader.spec")
+    print("Created google_photos_downloader.spec")
     
     # Run PyInstaller
-    print("⚙️  Running PyInstaller...")
+    print("Running PyInstaller...")
     try:
         result = subprocess.run([
             sys.executable, '-m', 'PyInstaller',
@@ -121,10 +121,10 @@ exe = EXE(
             'google_photos_downloader.spec'
         ], check=True, capture_output=True, text=True)
         
-        print("✅ Build completed successfully!")
+        print("Build completed successfully!")
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed: {e}")
+        print(f"Build failed: {e}")
         print("STDOUT:", e.stdout)
         print("STDERR:", e.stderr)
         return 1
@@ -143,8 +143,8 @@ exe = EXE(
     
     if exe_path:
         size_mb = exe_path.stat().st_size / (1024 * 1024)
-        print(f"🎉 Executable created: {exe_path}")
-        print(f"📦 Size: {size_mb:.1f} MB")
+        print(f"Executable created: {exe_path}")
+        print(f"Size: {size_mb:.1f} MB")
         
         # Create distribution folder
         dist_folder = Path('distribution')
@@ -167,7 +167,7 @@ exe = EXE(
             doc_path = project_root / doc
             if doc_path.exists():
                 shutil.copy2(doc_path, dist_folder)
-                print(f"   Copied {doc}")
+                print(f"Copied {doc}")
         
         # Create setup instructions
         setup_instructions = '''# Google Photos Downloader - Portable Version
@@ -222,15 +222,15 @@ No files are created outside of where you place the executable.
         with open(dist_folder / 'SETUP_INSTRUCTIONS.txt', 'w', encoding='utf-8') as f:
             f.write(setup_instructions)
         
-        print(f"📁 Distribution package created in: {dist_folder.absolute()}")
-        print("\n🎯 Next steps:")
+        print(f"Distribution package created in: {dist_folder.absolute()}")
+        print("\nNext steps:")
         print("1. Copy the entire 'distribution' folder to target computer")
         print("2. Follow SETUP_INSTRUCTIONS.txt to add credentials.json")
         print("3. Double-click GooglePhotosDownloader.exe to run")
         
         return 0
     else:
-        print("❌ Executable not found after build")
+        print("Executable not found after build")
         return 1
 
 
