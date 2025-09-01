@@ -66,19 +66,19 @@
   - Test that `python app/main.py` works without errors on Windows
   - _Requirements: 1.1, 1.2_
 
-- [-] 4. Clean up GitHub workflows
+- [x] 4. Clean up GitHub workflows
   - Remove complex PyInstaller build configurations from GitHub workflows
   - Simplify workflows to basic Python testing only
   - Remove executable packaging and artifact generation
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 4.1 Remove executable packaging workflows
+- [x] 4.1 Remove executable packaging workflows
   - Delete or simplify .github/workflows/build-and-release.yml to remove PyInstaller builds
   - Remove .github/workflows/release.yml executable generation
   - Keep only basic testing workflow if needed
   - _Requirements: 3.1, 3.2_
 
-- [ ] 4.2 Update remaining workflows for simplicity
+- [x] 4.2 Update remaining workflows for simplicity
   - Modify .github/workflows/test.yml to focus on basic Python compatibility testing
   - Remove complex build matrices and artifact generation
   - Ensure workflows test core functionality without executable packaging
