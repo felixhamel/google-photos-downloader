@@ -1,16 +1,16 @@
-# Google Photos Downloader - Core Dependencies
-google-auth>=2.17.0
-google-auth-oauthlib>=1.0.0
-google-auth-httplib2>=0.2.0
-google-api-python-client>=2.88.0
-requests>=2.31.0
-tkcalendar>=1.6.1
-pillow>=10.0.0
-pyyaml>=6.0
+# Google Photos Downloader - Development Dependencies
+# For development/building from source only
+# Users should download executables from releases instead
 
-# Development Dependencies (for building from source)
+# Build tools
+pyinstaller>=6.0.0
+
+# Testing
 pytest>=7.4.0
+
+# Code quality
 black>=23.7.0
 flake8>=6.0.0
 mypy>=1.5.0
-pyinstaller>=6.0.0
+
+# Core runtime dependencies are in requirements-web.txt

@@ -63,7 +63,7 @@ def build_executable():
         "pyinstaller",
         "--onefile",
         "--name", "GooglePhotosDownloader",
-        "src/google_photos_downloader.py"
+        "start_server.py"
     ]
     
     # Add platform-specific options

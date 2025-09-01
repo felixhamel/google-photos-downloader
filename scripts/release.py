@@ -238,7 +238,7 @@ test_script.py
         print("
 🚀 **Immediate Next Steps:**")
         print("1. 📋 Copy main application code:")
-        print(f"   → Copy the enhanced Python GUI code into: src/google_photos_downloader.py")
+        print(f"   → Web application is ready in app/ directory")
         
         print("
 2. 🔐 Setup Google API credentials:")
