@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-ABOUTME: PyInstaller build script for creating standalone executable
-ABOUTME: Packages the Google Photos Downloader into a single .exe file
 """
 import os
 import sys

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-ABOUTME: Simple CLI launcher script
-ABOUTME: Wrapper to make CLI mode easily accessible
 """
 import sys
 import os

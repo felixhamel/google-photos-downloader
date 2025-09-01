@@ -1,6 +1,4 @@
 """
-ABOUTME: Pydantic schemas for request/response validation
-ABOUTME: Defines data models for API endpoints and WebSocket communication
 """
 from datetime import datetime
 from typing import List, Optional, Dict, Any

@@ -1,6 +1,5 @@
 """
-ABOUTME: Configuration management for Google Photos downloader
-ABOUTME: Handles app settings, user preferences, and environment configuration
+Configuration management for the app.
 """
 import json
 import os

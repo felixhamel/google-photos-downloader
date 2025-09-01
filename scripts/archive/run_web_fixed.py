@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-ABOUTME: Fixed web application launcher with proper dependencies
-ABOUTME: Corrected version of run_web.py with all import issues resolved
 """
 import os
 import sys

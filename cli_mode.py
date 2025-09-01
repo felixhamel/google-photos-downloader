@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-ABOUTME: Complete CLI fallback mode for Google Photos Downloader
-ABOUTME: Full command-line interface with all features from web and GUI versions
+Command line interface for downloading Google Photos.
 """
 import os
 import sys

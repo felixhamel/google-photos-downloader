@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-ABOUTME: Complete project validation script
-ABOUTME: Tests all modes (GUI, Web, CLI) and entire project functionality
 """
 import os
 import sys
@@ -23,25 +21,25 @@ class FullProjectTester:
     
     def test(self, name: str, func) -> bool:
         """Run a test and track results."""
-        print(f"🔍 Testing {name}...")
+        print(f"Testing {name}...")
         try:
             result = func()
             if result:
-                print(f"✅ {name}: PASSED")
+                print(f"{name}: PASSED")
                 self.passed += 1
                 return True
             else:
-                print(f"❌ {name}: FAILED")
+                print(f"{name}: FAILED")
                 self.failed += 1
                 return False
         except Exception as e:
-            print(f"💥 {name}: EXCEPTION - {e}")
+            print(f"{name}: EXCEPTION - {e}")
             self.failed += 1
             return False
     
     def warning(self, message: str):
         """Log a warning."""
-        print(f"⚠️  WARNING: {message}")
+        print(f"WARNING: {message}")
         self.warnings += 1
     
     def test_python_environment(self) -> bool:
@@ -129,7 +127,7 @@ class FullProjectTester:
                 if expected_attr and not hasattr(module, expected_attr):
                     print(f"Module {module_name} missing attribute {expected_attr}")
                     return False
-                print(f"  ✓ {module_name}")
+                print(f"  OK {module_name}")
             except ImportError as e:
                 print(f"Cannot import {module_name}: {e}")
                 return False
@@ -326,7 +324,7 @@ class FullProjectTester:
     
     def run_full_validation(self) -> bool:
         """Run complete project validation."""
-        print("🧪 Google Photos Downloader - FULL PROJECT VALIDATION")
+        print("Google Photos Downloader - Full Project Test")
         print("=" * 70)
         
         tests = [
@@ -349,16 +347,16 @@ class FullProjectTester:
         
         # Summary
         print("=" * 70)
-        print(f"📊 VALIDATION RESULTS:")
-        print(f"✅ Passed: {self.passed}")
-        print(f"❌ Failed: {self.failed}")
-        print(f"⚠️  Warnings: {self.warnings}")
+        print(f"RESULTS:")
+        print(f"Passed: {self.passed}")
+        print(f"Failed: {self.failed}")
+        print(f"Warnings: {self.warnings}")
         
         if self.failed == 0:
-            print("🎉 ALL TESTS PASSED! Project is production ready.")
+            print("All tests passed!")
             return True
         else:
-            print("❌ Some tests failed. Project needs fixes.")
+            print("Some tests failed.")
             return False
 
 

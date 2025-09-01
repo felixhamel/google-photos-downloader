@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-ABOUTME: Comprehensive test script to validate entire project setup
-ABOUTME: Tests imports, dependencies, and basic functionality before deployment
 """
 import sys
 import os

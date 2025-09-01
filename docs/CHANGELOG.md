@@ -1,57 +1,39 @@
-# Changelog
+# What's changed
 
-All notable changes to Google Photos Downloader will be documented in this file.
+## v2.0.0 - August 2025
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Completely rewrote this thing as a web app because the GUI was broken.
 
-## [Unreleased]
+New stuff:
+- Web interface that actually works (runs on http://127.0.0.1:8000)
+- Command line version for scripting
+- Works on Windows without needing to compile anything
+- French interface 
+- Real-time progress bars
+- Can resume interrupted downloads
+- Executable versions so you don't need Python
 
-### Added
-- Initial project setup
-- GitHub Actions CI/CD pipeline
-- Automated builds for Windows, macOS, Linux
+Fixed:
+- The empty window bug that made the original GUI unusable
+- Windows compatibility issues with Rust dependencies
+- Better error messages when things go wrong
 
-### Changed
-- Enhanced GUI with calendar date pickers
-- Improved progress tracking with speed and ETA
+Technical changes:
+- FastAPI instead of tkinter
+- WebSocket for live updates
+- Better OAuth flow
+- Modular code structure
 
-### Fixed
-- Robust error handling and retry logic
+## v1.0.0 - August 2025
 
-## [1.0.0] - 2025-08-30
+Initial version with tkinter GUI. Had some issues but the core Google Photos API integration worked.
 
-### Added
-- Cross-platform GUI application
-- Google Photos API integration
-- OAuth2 authentication flow
-- Real-time progress tracking
-- Automatic file organization
-- Multi-threaded downloads
-- Resume support for interrupted downloads
+Features:
+- Basic GUI for downloading photos
+- Date range selection
+- OAuth authentication
+- Progress tracking
 
-### Features
-- 🗓️ Interactive calendar date pickers
-- 📊 Progress bar with percentage and speed
-- 🌐 Browser-based OAuth authentication
-- ⚡ Fast multi-threaded downloads
-- 📁 Smart timestamped file naming
-- 🛡️ Comprehensive error handling
-- 🎯 Cross-platform compatibility
-
----
-
-## Release Types
-
-- **Major** (X.0.0) - Breaking changes, major new features
-- **Minor** (x.X.0) - New features, backwards compatible
-- **Patch** (x.x.X) - Bug fixes, security updates
-
-## Categories
-
-- **Added** - New features
-- **Changed** - Changes in existing functionality  
-- **Deprecated** - Soon-to-be removed features
-- **Removed** - Removed features
-- **Fixed** - Bug fixes
-- **Security** - Security fixes
+Known issues:
+- GUI would sometimes show empty window
+- Windows users had trouble with dependencies

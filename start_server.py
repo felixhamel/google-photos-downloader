@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-ABOUTME: Standalone server launcher for Windows/MacOS compatibility
-ABOUTME: Replaces complex multiline batch script with simple Python launcher
+Starts the web server and opens the browser automatically.
 """
 import os
 import sys

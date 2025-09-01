@@ -1,6 +1,4 @@
 """
-ABOUTME: Download session management with state persistence
-ABOUTME: Handles download progress tracking and resume capability
 """
 import json
 import uuid

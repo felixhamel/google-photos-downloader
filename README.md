@@ -1,108 +1,76 @@
 # Google Photos Downloader
 
-A simple tool to download your Google Photos library with multiple interface options.
+I got tired of Google Photos not having a proper export feature, so I made this.
 
 ## What it does
 
-Downloads photos and videos from your Google Photos account to your local machine. Supports downloading by date ranges, specific albums, or recent photos. All downloads preserve original quality and include metadata.
+Downloads your photos and videos from Google Photos to your computer. You can grab everything, just recent stuff, or specific date ranges. The original quality is preserved.
 
-## Quick Start
+## Getting started
 
-### 1. Get Google credentials
+First you need to get credentials from Google (I know, it's annoying but necessary):
 
-You need OAuth2 credentials from Google Cloud Console:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google Photos Library API
-4. Create OAuth2 credentials (Desktop application type)
-5. Download the JSON file and rename it to `credentials.json`
-6. Put it in this folder
+2. Make a new project 
+3. Enable the "Google Photos Library API"
+4. Create OAuth2 credentials (pick "Desktop application")
+5. Download the JSON file, rename it to `credentials.json` and put it here
 
-### 2. Choose your interface
+Then pick how you want to use it:
 
-**Web interface** (recommended for most users):
+**Web version** (easiest):
 ```bash
 python start_server.py
 ```
-Opens http://127.0.0.1:8000 in your browser with a friendly interface.
+This opens http://127.0.0.1:8000 in your browser.
 
-**Command line** (good for automation):
+**Command line** (for scripts):
 ```bash
-# Download last 30 days
 python cli_mode.py --last-30-days
-
-# Download specific date range
-python cli_mode.py --start-date 2023-06-01 --end-date 2023-08-31 --output "Summer 2023"
-
-# List your albums first
-python cli_mode.py --list-albums
+python cli_mode.py --start-date 2023-06-01 --end-date 2023-08-31
 ```
 
-**Original GUI** (if you prefer desktop apps):
+**Original desktop app**:
 ```bash
 python src/google_photos_downloader.py
 ```
+(Though this one had some issues, which is why I made the web version)
 
-## Installation
+## Setup
 
-Install dependencies:
+You'll need Python 3.8+ installed.
+
 ```bash
 pip install -r requirements-web.txt
 ```
 
-On Windows, if you get compilation errors:
+Windows users: if you get weird compilation errors, try:
 ```bash
 pip install --only-binary=all -r requirements-web-windows.txt
 ```
 
-## Features
+## What it can do
 
-- Downloads original quality photos and videos
-- Organizes files with timestamps (e.g., `20230615_143022_photo.jpg`)
-- Resumes interrupted downloads
-- Real-time progress tracking
-- Works on Windows, macOS, and Linux
-- Multiple interface options (web, CLI, GUI)
+- Downloads full quality photos and videos
+- Names files with timestamps like `20230615_143022_photo.jpg`
+- Can resume if it gets interrupted
+- Shows progress in real-time
+- Works on Windows, Mac, Linux
 
-## Common Issues
+## Troubleshooting
 
-**"credentials.json not found"**: You need to set up Google API access first (see step 1 above).
+**"credentials.json not found"** - You skipped the Google setup step above
 
-**"Rust/Cargo compilation errors"** on Windows: Use `requirements-web-windows.txt` instead.
+**Compilation errors on Windows** - Use the Windows-specific requirements file
 
-**"No photos found"**: Check your date ranges and make sure you have photos in Google Photos for those dates.
+**"No photos found"** - Double-check your date ranges
 
-## How authentication works
+## How the Google login works
 
-Your `credentials.json` file identifies this app to Google. When you run it the first time, it opens a browser to log into your Google account and authorize access. This creates a `token.json` file that's tied to your specific Google account.
+The `credentials.json` file just tells Google what app this is. When you run it the first time, it opens your browser to log into your Google account. If you say yes, it creates a `token.json` file that lets it access your photos.
 
-The app only has read-only access to your Google Photos - it can't modify or delete anything.
-
-## Project Structure
-
-```
-├── start_server.py              # Web interface launcher
-├── cli_mode.py                  # Command line interface  
-├── version.py                   # Version information
-├── app/                         # Web application code
-├── static/                      # Web interface files
-├── scripts/                     # Utility scripts
-│   ├── launchers/              # Platform-specific launchers
-│   ├── build/                  # Build and packaging scripts
-│   └── archive/                # Legacy/experimental scripts
-├── tests/                       # Test scripts
-├── src/                         # Original GUI source
-└── requirements-*.txt           # Dependencies
-```
+Don't worry - it only has read access. It can't delete or modify anything.
 
 ## License
 
-MIT License - feel free to use and modify.
-
-## Contributing
-
-This is a personal project but pull requests are welcome. Please test your changes across different operating systems if possible.
-
----
-
-Need help? Check `OAUTH_GUIDE.md` for detailed setup instructions or `INSTALL_WINDOWS.md` for Windows-specific troubleshooting.
+MIT - do whatever you want with this code.

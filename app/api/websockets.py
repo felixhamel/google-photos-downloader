@@ -1,6 +1,4 @@
 """
-ABOUTME: WebSocket connection manager for real-time updates
-ABOUTME: Handles client connections and progress notifications during downloads
 """
 import json
 import asyncio
