@@ -7,9 +7,9 @@ uvicorn==0.23.2
 pydantic==1.10.13
 
 # Web essentials
-python-multipart==0.0.6
+python-multipart==0.0.18
 websockets==11.0.3
-jinja2==3.1.2
+jinja2==3.1.6
 
 # Google APIs - stable versions
 google-auth-oauthlib==0.7.1
@@ -18,11 +18,11 @@ google-api-python-client==2.100.0
 google-auth==2.22.0
 
 # HTTP and utilities
-requests==2.31.0
+requests==2.32.4
 python-dotenv==1.0.0
 
 # Windows compatibility
 pywin32==306; platform_system=="Windows"
 six==1.16.0
-urllib3==1.26.18
-certifi==2023.7.22
+urllib3==2.5.0
+certifi==2024.7.4
