@@ -1,5 +1,8 @@
 """
+WebSocket connection manager for real-time updates.
 """
+from __future__ import annotations
+
 import json
 import asyncio
 from typing import Dict, Set, Optional

@@ -1,5 +1,8 @@
 """
+Download session management for tracking progress and state.
 """
+from __future__ import annotations
+
 import json
 import uuid
 import os

@@ -1,6 +1,8 @@
 """
 API routes for Google Photos Downloader
 """
+from __future__ import annotations
+
 import asyncio
 from typing import List
 from pathlib import Path

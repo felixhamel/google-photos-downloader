@@ -1,10 +1,10 @@
 # Google Photos Downloader - Web Dependencies (Windows Compatible)
 # ABOUTME: Pure Python dependencies - NO Rust/Cargo required
 
-# Core web framework - stable versions that don't need compilation
-fastapi==0.100.1
-uvicorn==0.23.2
-pydantic==1.10.13
+# Core web framework - updated for Python compatibility
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.5.0
 
 # Web essentials  
 python-multipart==0.0.18
@@ -26,3 +26,4 @@ PyYAML==6.0.1
 six==1.16.0
 urllib3==1.26.20
 certifi==2024.7.4
+typing-extensions>=4.8.0

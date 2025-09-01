@@ -1,6 +1,8 @@
 """
 Core Google Photos downloader logic
 """
+from __future__ import annotations
+
 import os
 import requests
 import hashlib

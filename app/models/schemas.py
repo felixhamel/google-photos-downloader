@@ -1,9 +1,12 @@
 """
+Pydantic models for API requests and responses.
 """
+from __future__ import annotations
+
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class MediaType(str, Enum):
@@ -20,6 +23,8 @@ class SourceType(str, Enum):
 
 class DownloadRequest(BaseModel):
     """Request model for starting a download."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
     source_type: SourceType
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -69,6 +74,8 @@ class SessionInfo(BaseModel):
 
 class ConfigUpdate(BaseModel):
     """Configuration update request."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
     section: str
     key: str
     value: Any
