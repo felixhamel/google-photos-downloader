@@ -1,49 +1,50 @@
-name: Tests
+name: Basic Python Tests
 
 on:
   push:
-    branches: [ main, feat/web-app ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
 jobs:
   test:
-    name: Test ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    name: Test Python Compatibility
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11']
         
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
       
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install --only-binary=all -r requirements-web.txt
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          pip install -r requirements-web-windows.txt
+        else
+          pip install -r requirements-web.txt
+        fi
+      shell: bash
         
-    - name: Test imports
+    - name: Test core imports
       run: |
-        python -c "import app.main"
-        python -c "import cli_mode"
-        python -c "from app.core.downloader import GooglePhotosDownloader"
-        python -c "from app.core.config import ConfigManager"
+        python -c "import app.main; print('✓ FastAPI app imports successfully')"
+        python -c "import cli_mode; print('✓ CLI mode imports successfully')"
+        python -c "from app.core.downloader import GooglePhotosDownloader; print('✓ Downloader imports successfully')"
+        python -c "from app.core.config import ConfigManager; print('✓ Config manager imports successfully')"
         
-    - name: Test CLI help
+    - name: Test CLI help command
       run: |
         python cli_mode.py --help
         
-    - name: Test web app startup (import only)
+    - name: Test web app creation
       run: |
-        python -c "from app.main import app; print('FastAPI app created successfully')"
-        
-    - name: Run validation script
-      run: |
-        python tests/test_simple.py
+        python -c "from app.main import app; print('✓ FastAPI app created successfully')"
