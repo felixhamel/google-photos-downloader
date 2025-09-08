@@ -25,5 +25,5 @@ python-dotenv==1.0.0
 pywin32==306; platform_system=="Windows"
 six==1.16.0
 urllib3==1.26.20
-certifi==2024.7.4
+certifi==2025.8.3
 typing-extensions>=4.8.0
