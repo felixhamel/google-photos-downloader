@@ -22,7 +22,7 @@ requests==2.32.4
 python-dotenv==1.0.0
 
 # Windows compatibility
-pywin32==306; platform_system=="Windows"
+pywin32==311; platform_system=="Windows"
 six==1.16.0
 urllib3==1.26.20
 certifi==2024.7.4
