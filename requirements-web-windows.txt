@@ -19,7 +19,7 @@ google-auth==2.22.0
 
 # HTTP and utilities
 requests==2.32.4
-python-dotenv==1.0.0
+python-dotenv==1.1.1
 
 # Windows compatibility
 pywin32==306; platform_system=="Windows"
